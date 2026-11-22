@@ -43,6 +43,7 @@ case "$mode" in
   ping) event=ping ;;
   clear)
     [ -f "$marker" ] || exit 0
+    if [ "$(cat "$marker" 2>/dev/null)" = ping ] && [ "$(cn_field "$payload" hook_event_name)" != UserPromptSubmit ]; then exit 0; fi
     rm -f "$marker" 2>/dev/null
     [ -f "$dir/clear" ] || exit 0
     name=$(cn_repo_name "$(cn_repo_root "$(cn_project_dir "$payload")")")
@@ -57,7 +58,8 @@ if [ "$event" = ping ]; then record=$(cn_build_ping "$2"); else record=$(cn_buil
 if [ "$event" = done ]; then
   rm -f "$marker" 2>/dev/null
 else
-  mkdir -p "$mdir" 2>/dev/null && : > "$marker" 2>/dev/null
+  _cn_mk=toast; [ "$event" = ping ] && _cn_mk=ping
+  mkdir -p "$mdir" 2>/dev/null && echo "$_cn_mk" > "$marker" 2>/dev/null
 fi
 
 [ -f "$dir/notify" ] || exit 0

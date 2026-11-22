@@ -108,6 +108,18 @@ rc=$(pingrun x); assert_log_empty ping_sdk_skipped
 reset; CLAUDE_CODE_SESSION_ATTENDED=0; export CLAUDE_CODE_SESSION_ATTENDED
 rc=$(pingrun x); assert_log_empty ping_unattended_skipped
 
+# --- ping survives its own PostToolUse clear
+clearas() { fx perm.json | sed "s/\"Notification\"/\"$1\"/" | sh "$DISPATCH" clear; }
+reset; pingrun x >/dev/null; : > "$STUB_LOG"; clearas PostToolUse
+assert_log_empty ping_post_tool_no_clear
+[ -f "$MARK/sess-ping-1.pending" ] && ok ping_post_tool_marker_kept || bad ping_post_tool_marker_kept "marker gone"
+reset; pingrun x >/dev/null; : > "$STUB_LOG"
+fx perm.json | sed 's/sess-perm-1/sess-ping-1/; s/"Notification"/"UserPromptSubmit"/' | sh "$DISPATCH" clear
+assert_log_has ping_prompt_clears '^clear sess-ping-1 '
+[ ! -f "$MARK/sess-ping-1.pending" ] && ok ping_prompt_marker_gone || bad ping_prompt_marker_gone "marker still there"
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"; clearas PostToolUse
+assert_log_has perm_post_tool_clears '^clear sess-perm-1 '
+
 # --- R6a: unreadable content.sh exits 0 (copy dispatch.sh alone)
 mkdir -p "$FIXROOT/lone/scripts"; cp "$DISPATCH" "$FIXROOT/lone/scripts/dispatch.sh"
 reset; rc=$(echo '{}' | sh "$FIXROOT/lone/scripts/dispatch.sh" notify; echo $?)
