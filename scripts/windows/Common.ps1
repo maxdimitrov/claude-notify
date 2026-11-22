@@ -28,7 +28,27 @@ function Read-CnStdinRecord {
 
 function Get-CnLink([hashtable]$Record) {
     return 'claude-focus:?root=' + [Uri]::EscapeDataString("$($Record['root'])") +
-        '&session=' + [Uri]::EscapeDataString("$($Record['session'])")
+        '&session=' + [Uri]::EscapeDataString("$($Record['session'])") +
+        '&ep=' + [Uri]::EscapeDataString("$($Record['entrypoint'])") +
+        '&raw=' + [Uri]::EscapeDataString("$($Record['rawroot'])")
+}
+
+# The folder name to match VS Code window titles against: the uncut leaf (a worktree
+# opened as its own window) when it differs from the cut root and exactly one window
+# matches it; otherwise the cut root. $Finder returns the window handles for a name.
+function Resolve-CnRoot([string]$Root, [string]$RawRoot, [scriptblock]$Finder = { param($n) [CcWin]::FindAll($n) }) {
+    if ($RawRoot -and $RawRoot -ne $Root) {
+        $w = @(& $Finder $RawRoot | Where-Object { $null -ne $_ })
+        if ($w.Count -eq 1) { return $RawRoot }
+    }
+    return $Root
+}
+
+# True when a just-shown toast is already stale: a non-done event whose pending
+# marker was removed (the session moved on before the toast appeared).
+function Test-CnStaleToast([string]$EventName, [string]$Marker) {
+    if ($EventName -eq 'done' -or -not $Marker) { return $false }
+    return -not (Test-Path -LiteralPath $Marker)
 }
 
 function ConvertTo-CnXml([string]$s) {

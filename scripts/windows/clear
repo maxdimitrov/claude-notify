@@ -1,5 +1,5 @@
 #!/bin/sh
-# claude-notify Windows backend shim: clear <session> <root> -> Clear.ps1. Always exits 0.
+# claude-notify Windows backend shim: clear <session> <root> [<rawroot>] -> Clear.ps1. Always exits 0.
 here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || exit 0
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w "$here/Clear.ps1")" -Session "$1" -Root "$2" </dev/null >/dev/null 2>&1
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w "$here/Clear.ps1")" -Session "$1" -Root "$2" -RawRoot "$3" </dev/null >/dev/null 2>&1
 exit 0

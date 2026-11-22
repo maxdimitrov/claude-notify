@@ -1,5 +1,5 @@
 # Remove the session's toast and stop the taskbar flash. Windows PowerShell 5.1. Pure ASCII.
-param([string]$Session, [string]$Root)
+param([string]$Session, [string]$Root, [string]$RawRoot)
 $ErrorActionPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
@@ -21,6 +21,8 @@ try {
 } catch { Write-CnLog "clear failed: $($_.Exception.Message)" }
 
 try {
-    if ($Root) { foreach ($h in [CcWin]::FindAll($Root)) { [CcWin]::StopFlash($h) } }
+    $match = $Root
+    try { $match = Resolve-CnRoot $Root $RawRoot } catch {}
+    if ($match) { foreach ($h in [CcWin]::FindAll($match)) { [CcWin]::StopFlash($h) } }
 } catch { Write-CnLog "stopflash failed: $($_.Exception.Message)" }
 exit 0

@@ -1,7 +1,9 @@
 # Handler for claude-focus: links (toast click). Windows PowerShell 5.1. Pure ASCII.
-# claude-focus:?root=<workspace folder name>&session=<session uuid>
+# claude-focus:?root=<repo folder name>&session=<session uuid>&ep=<entrypoint>&raw=<uncut folder name>
+# Window name: raw (worktree window) when it differs from root and exactly one window has it, else root.
 # 0 windows: log. >1: focus the first, log ambiguous, no reveal.
-# 1 window: focus, wait 1000 ms, reveal the session tab only if still foreground.
+# 1 window: focus; reveal only for VS Code sessions (ep=claude-vscode): wait 1000 ms,
+# then reveal the session tab only if still foreground.
 param([string]$Uri)
 $ErrorActionPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -21,17 +23,23 @@ foreach ($kv in ("$q" -split '&')) {
     $k, $v = $kv -split '=', 2
     if ($k) { $p[$k] = [Uri]::UnescapeDataString("$v") }
 }
-$root = $p['root']; $session = $p['session']
+$root = $p['root']; $session = $p['session']; $ep = "$($p['ep'])"; $raw = "$($p['raw'])"
 if (-not $root) { Write-CnLog "no root in link"; exit 0 }
 
-$wins = @([CcWin]::FindAll($root))
-if ($wins.Count -eq 0) { Write-CnLog "no window for root '$root'"; exit 0 }
+$match = $root
+try { $match = Resolve-CnRoot $root $raw } catch { Write-CnLog "resolve failed: $($_.Exception.Message)" }
+
+$wins = @([CcWin]::FindAll($match))
+if ($wins.Count -eq 0) { Write-CnLog "no window for root '$match'"; exit 0 }
 
 $h = $wins[0]
 $ok = [CcWin]::Focus($h)
-if ($wins.Count -gt 1) { Write-CnLog "ambiguous: $($wins.Count) windows for root '$root' focused=$ok"; exit 0 }
-Write-CnLog "root='$root' session='$session' focused=$ok"
+if ($wins.Count -gt 1) { Write-CnLog "ambiguous: $($wins.Count) windows for root '$match' focused=$ok"; exit 0 }
+Write-CnLog "root='$match' session='$session' ep='$ep' focused=$ok"
 if (-not $ok) { exit 0 }
+
+# Terminal / other sessions: the reveal link would open a duplicate of the session in VS Code.
+if ($ep -ne 'claude-vscode') { Write-CnLog "no reveal: entrypoint=$ep"; exit 0 }
 
 if ($session -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
     # VS Code routes URLs to the last-focused window; give it time to register the focus change.

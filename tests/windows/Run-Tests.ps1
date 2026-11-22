@@ -25,7 +25,28 @@ $rec2 = Read-CnRecord ([Text.Encoding]::UTF8.GetBytes("event=done`r`nroot=claude
 Assert-Eq 'record CRLF tolerated' $rec2['root'] 'claude'
 
 # Get-CnLink
-Assert-Eq 'link' (Get-CnLink @{ root = 'my repo'; session = 'sid-1' }) 'claude-focus:?root=my%20repo&session=sid-1'
+Assert-Eq 'link' (Get-CnLink @{ root = 'my repo'; session = 'sid-1'; entrypoint = 'claude-vscode'; rawroot = 'wt 1' }) 'claude-focus:?root=my%20repo&session=sid-1&ep=claude-vscode&raw=wt%201'
+Assert-Eq 'link without ep/raw' (Get-CnLink @{ root = 'r'; session = 's' }) 'claude-focus:?root=r&session=s&ep=&raw='
+
+# Resolve-CnRoot (fake finder: name -> handles)
+$wins = @{ 'repo' = @([IntPtr]1, [IntPtr]2); 'wt1' = @([IntPtr]3); 'wt2' = @([IntPtr]4, [IntPtr]5) }
+$finder = { param($n) if ($wins.ContainsKey($n)) { $wins[$n] } else { @() } }
+Assert-Eq 'resolve rawroot with one window' (Resolve-CnRoot 'repo' 'wt1' $finder) 'wt1'
+Assert-Eq 'resolve rawroot with no window' (Resolve-CnRoot 'repo' 'wt9' $finder) 'repo'
+Assert-Eq 'resolve rawroot with two windows' (Resolve-CnRoot 'repo' 'wt2' $finder) 'repo'
+Assert-Eq 'resolve rawroot equals root' (Resolve-CnRoot 'repo' 'repo' $finder) 'repo'
+Assert-Eq 'resolve empty rawroot' (Resolve-CnRoot 'repo' '' $finder) 'repo'
+Assert-Eq 'resolve null finder output' (Resolve-CnRoot 'repo' 'wt1' { param($n) $null }) 'repo'
+
+# Test-CnStaleToast
+$mk = Join-Path ([IO.Path]::GetTempPath()) ("cn-test-{0}.pending" -f $PID)
+Set-Content -Path $mk -Value 'toast'
+Assert-Eq 'stale: marker present' (Test-CnStaleToast 'permission' $mk) 'False'
+Remove-Item -Path $mk -Force
+Assert-Eq 'stale: marker gone' (Test-CnStaleToast 'permission' $mk) 'True'
+Assert-Eq 'stale: ping marker gone' (Test-CnStaleToast 'ping' $mk) 'True'
+Assert-Eq 'stale: done never' (Test-CnStaleToast 'done' $mk) 'False'
+Assert-Eq 'stale: no marker path' (Test-CnStaleToast 'permission' '') 'False'
 
 # New-CnToastXml
 $link = Get-CnLink @{ root = 'claude'; session = 's1' }
@@ -72,6 +93,13 @@ Assert-True 'not watching other file' (-not (Test-CnWatching 'notify.ps1 - claud
 Assert-True 'not watching other root' (-not (Test-CnWatching 'Notifications - mailroom - Visual Studio Code' 'claude' 'Notifications'))
 Assert-True 'not watching empty tab title' (-not (Test-CnWatching 'Notifications - claude - Visual Studio Code' 'claude' ''))
 Assert-True 'not watching non-vscode' (-not (Test-CnWatching 'Notifications - Firefox' 'claude' 'Notifications'))
+
+# Every backend script parses under this PowerShell (5.1).
+foreach ($f in 'Common.ps1', 'Notify.ps1', 'Clear.ps1', 'Focus.ps1') {
+    $errs = $null; $tokens = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot "..\..\scripts\windows\$f"), [ref]$tokens, [ref]$errs)
+    Assert-Eq "parses: $f" (@($errs).Count) '0'
+}
 
 # Register-CnHandlers (override key only; never the real Classes)
 $testRoot = 'HKCU:\Software\ClaudeNotifyTest'
