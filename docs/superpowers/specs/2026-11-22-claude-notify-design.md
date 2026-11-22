@@ -123,3 +123,8 @@ Maksim runs many Claude Code sessions at once: six or so VS Code windows on the 
 - Exact sounds per event on macOS/Linux; the AUMID id string; icon design.
 - Testing approach: at minimum a fake-payload pipe test per platform script (permission, question, done, headless-skip), the ASCII check, and the manual click-from-another-window check on Windows. Pester or bats only if cheap.
 - Whether reading the transcript for the title needs a size cap (transcripts can be large; title entries recur, so reading the tail is likely enough).
+
+## Follow-ups (after 0.1.0)
+
+1. **Answer Claude's multiple-choice questions from the toast (user priority, 2026-11-22).** When Claude asks a question with options (AskUserQuestion), the toast shows one button per option; a click answers the question without opening VS Code. Candidate mechanism: a PreToolUse or PermissionRequest hook on AskUserQuestion that, when the user is not watching the tab, shows the option buttons and waits (bounded, e.g. 2 minutes) for a click delivered through the `claude-focus:`-style link, then returns the answer via `updatedInput` (`answers`); on timeout it returns nothing and the normal dialog appears. Spike first: confirm the hook can supply answers, and see how the VS Code tab behaves while the hook waits.
+2. **Quick-reply buttons on "done" and Allow/Deny on permission prompts.** Same waiting-hook pattern (Stop hook returning a continue instruction; PermissionRequest hook returning allow/deny). Lower priority than 1; same spike answers the UX question.
