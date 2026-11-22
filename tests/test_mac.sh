@@ -68,6 +68,10 @@ has exec_projectdir "ARG $PD"
 has exec_session "ARG vscode://anthropic.claude-code/open?session=$SID"
 [ -e /tmp/pwned ] && { bad exec_no_injection "/tmp/pwned created"; rm -f /tmp/pwned; } || ok exec_no_injection
 
+# 2a. ping uses Ping
+reset; rec ping "r" "m" "" | run_notify >/dev/null
+has ping_sound 'ARG Ping'
+
 # 2. done uses Glass
 reset; rec done "r" "m" "" | run_notify >/dev/null
 has done_glass 'ARG Glass'

@@ -44,6 +44,9 @@ Assert-Eq 'audio silent' $x.toast.audio.silent 'true'
 Assert-Eq 'cyrillic text node' (@($x.toast.visual.binding.text)[1]) "claude - $cyr"
 $q = [xml](New-CnToastXml @{ event = 'question'; title = 't'; line1 = 'l'; line2 = 'l2' } $link)
 Assert-Eq 'question scenario' $q.toast.scenario 'reminder'
+$p = [xml](New-CnToastXml @{ event = 'ping'; title = 'Claude needs you'; line1 = 'l'; line2 = 'l2' } $link)
+Assert-Eq 'ping scenario' $p.toast.scenario 'reminder'
+Assert-Eq 'ping go action' ((@($p.toast.actions.action))[0].content) 'Go to session'
 $done = [xml](New-CnToastXml @{ event = 'done'; title = 'Claude is done'; line1 = 'r'; line2 = 'x' } $link)
 Assert-Eq 'done duration' $done.toast.duration 'long'
 Assert-Eq 'done no scenario' ($done.toast.HasAttribute('scenario')) 'False'

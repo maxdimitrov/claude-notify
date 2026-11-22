@@ -51,7 +51,7 @@ cn_clean_text() {
           -e 's/^[[:space:]]*#\{1,6\}[[:space:]]*//' \
           -e 's/^[[:space:]]*>[[:space:]]*//' \
           -e 's/!\{0,1\}\[\([^]]*\)\]([^)]*)/\1/g' \
-          -e 's/\*\*//g' -e 's/__//g' -e 's/~~//g' -e 's/`//g' \
+          -e 's/\*\*//g' -e 's/~~//g' -e 's/`//g' \
     | tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')
   if cn_have_jq; then
     printf '%s' "$_cn_c" | jq -Rrj 'if length > 180 then .[0:177] + "..." else . end' 2>/dev/null | tr -d '\r'
@@ -70,6 +70,7 @@ cn_event_title() {
     permission) printf '%s' 'Claude needs permission' ;;
     question) printf '%s' 'Claude has a question' ;;
     done) printf '%s' 'Claude is done' ;;
+    ping) printf '%s' 'Claude needs you' ;;
   esac
 }
 
@@ -95,5 +96,39 @@ cn_build_record() {
   # values must be single-line
   printf 'event=%s\nsession=%s\nroot=%s\nprojectdir=%s\ntitle=%s\ntabtitle=%s\nline1=%s\nline2=%s\n' \
     "$_cn_ev" "$_cn_sid" "$_cn_name" "$(cn_repo_root "$_cn_dir")" "$(cn_event_title "$_cn_ev")" \
+    "$(printf '%s' "$_cn_tab" | tr '\n' ' ')" "$(printf '%s' "$_cn_l1" | tr '\n' ' ')" "$_cn_l2"
+}
+
+# cn_turn_origin <transcript_path> -> last "origin":{"kind":"<kind>"} in the last 4 MB, else empty.
+# Kinds seen: human, peer, task-notification. Plain text match, no jq needed.
+cn_turn_origin() {
+  _cn_p=$1
+  [ -n "$_cn_p" ] || return 0
+  [ -f "$_cn_p" ] || _cn_p=$(printf '%s' "$_cn_p" | sed 's#\#/#g')
+  [ -f "$_cn_p" ] || return 0
+  tail -c 4194304 "$_cn_p" 2>/dev/null | grep -o '"origin":{"kind":"[^"]*"}' | tail -n 1 \
+    | sed 's/^"origin":{"kind":"\(.*\)"}$/\1/' | tr -d '\r'
+}
+
+# cn_build_ping <message> -> the 8-line record for a deliberate ping, built from env:
+# CLAUDE_CODE_SESSION_ID, CLAUDE_PROJECT_DIR (else $PWD), transcript found under $HOME/.claude/projects.
+cn_build_ping() {
+  _cn_sid=${CLAUDE_CODE_SESSION_ID:-}
+  _cn_dir=${CLAUDE_PROJECT_DIR:-$PWD}
+  _cn_name=$(cn_repo_name "$(cn_repo_root "$_cn_dir")")
+  _cn_tp=''
+  if [ -n "$_cn_sid" ]; then
+    for _cn_f in "$HOME"/.claude/projects/*/"$_cn_sid".jsonl; do
+      [ -f "$_cn_f" ] && { _cn_tp=$_cn_f; break; }
+    done
+  fi
+  _cn_tab=''; _cn_l2=''
+  if cn_have_jq; then
+    _cn_tab=$(cn_tab_title "$_cn_tp")
+    _cn_l2=$(cn_clean_text "$1")
+  fi
+  if [ -n "$_cn_tab" ]; then _cn_l1="$_cn_name - $_cn_tab"; else _cn_l1=$_cn_name; fi
+  printf 'event=ping\nsession=%s\nroot=%s\nprojectdir=%s\ntitle=%s\ntabtitle=%s\nline1=%s\nline2=%s\n' \
+    "$_cn_sid" "$_cn_name" "$(cn_repo_root "$_cn_dir")" "$(cn_event_title ping)" \
     "$(printf '%s' "$_cn_tab" | tr '\n' ' ')" "$(printf '%s' "$_cn_l1" | tr '\n' ' ')" "$_cn_l2"
 }

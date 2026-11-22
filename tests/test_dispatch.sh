@@ -84,5 +84,34 @@ rc=$(echo '{}' | sh "$DISPATCH" bogus; echo $?); assert_rc0 bogus_rc "$rc"
 reset; run notify cyr.json >/dev/null
 assert_log_has cyr_tab "tabtitle=$(cat "$FIX/expected_cyr.txt")"
 
+# --- background-turn filter (stop only)
+stopfx() { fx stop.json | sed "s/transcript_titles/$1/" | sh "$DISPATCH" stop; echo $?; }
+reset; rc=$(stopfx transcript_origin_peer); assert_rc0 stop_peer_rc "$rc"; assert_log_empty stop_peer_skipped
+reset; rc=$(stopfx transcript_origin_task); assert_log_empty stop_task_skipped
+reset; rc=$(stopfx transcript_origin_human); assert_log_has stop_human_notifies 'event=done'
+reset; rc=$(stopfx transcript_origin_none); assert_log_has stop_noorigin_notifies 'event=done'
+reset; fx perm.json | sed 's/transcript_titles/transcript_origin_peer/' | sh "$DISPATCH" notify >/dev/null
+assert_log_has notify_ignores_origin 'event=permission'
+
+# --- ping
+PH="$FIXROOT/home"; mkdir -p "$PH/.claude/projects/-x"
+cp "$FIX/transcript_titles.jsonl" "$PH/.claude/projects/-x/sess-ping-1.jsonl"
+pingrun() { HOME="$PH" CLAUDE_CODE_SESSION_ID=sess-ping-1 CLAUDE_PROJECT_DIR=/p/my-repo sh "$DISPATCH" ping "$1" </dev/null; echo $?; }
+reset; rc=$(pingrun 'ready to test'); assert_rc0 ping_rc "$rc"
+assert_log_has ping_event '^event=ping$'
+assert_log_has ping_title '^title=Claude needs you$'
+assert_log_has ping_line2 '^line2=ready to test$'
+assert_log_has ping_root '^root=my-repo$'
+[ -f "$MARK/sess-ping-1.pending" ] && ok ping_marker || bad ping_marker "no marker"
+reset; CLAUDE_CODE_ENTRYPOINT=sdk-cli; export CLAUDE_CODE_ENTRYPOINT
+rc=$(pingrun x); assert_log_empty ping_sdk_skipped
+reset; CLAUDE_CODE_SESSION_ATTENDED=0; export CLAUDE_CODE_SESSION_ATTENDED
+rc=$(pingrun x); assert_log_empty ping_unattended_skipped
+
+# --- R6a: unreadable content.sh exits 0 (copy dispatch.sh alone)
+mkdir -p "$FIXROOT/lone/scripts"; cp "$DISPATCH" "$FIXROOT/lone/scripts/dispatch.sh"
+reset; rc=$(echo '{}' | sh "$FIXROOT/lone/scripts/dispatch.sh" notify; echo $?)
+assert_rc0 missing_content_rc "$rc"
+
 rm -rf "$FIXROOT"
 if [ "$fails" = 0 ]; then echo "dispatch: PASS"; exit 0; else echo "dispatch: $fails FAILED"; exit 1; fi

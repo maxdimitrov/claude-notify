@@ -1,13 +1,14 @@
 #!/bin/sh
-# claude-notify dispatcher. Usage: dispatch.sh notify|stop|clear  (hook JSON on stdin).
+# claude-notify dispatcher. Usage: dispatch.sh notify|stop|clear (hook JSON on stdin) | ping "<message>" (env only).
 # Guards, builds the record, keeps a pending marker per session, calls the platform
 # backend. Always exits 0: a broken notifier must never affect a session.
 
 here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || exit 0
+[ -r "$here/lib/content.sh" ] || exit 0
 . "$here/lib/content.sh" 2>/dev/null || exit 0
 
 mode=$1
-payload=$(cat)
+payload=; [ "$mode" = ping ] || payload=$(cat)
 
 # Headless / helper sessions stay silent.
 case "${CLAUDE_CODE_ENTRYPOINT:-}" in sdk*) exit 0 ;; esac
@@ -21,7 +22,7 @@ esac
 dir=${CLAUDE_NOTIFY_PLATFORM_DIR:-$here/$platform}
 
 mdir="${TMPDIR:-${TEMP:-/tmp}}/claude-notify"
-session=$(cn_field "$payload" session_id)
+if [ "$mode" = ping ]; then session=${CLAUDE_CODE_SESSION_ID:-}; else session=$(cn_field "$payload" session_id); fi
 [ -n "$session" ] || session=unknown
 safe=$(printf '%s' "$session" | tr -c 'A-Za-z0-9_-' '_')
 marker="$mdir/$safe.pending"
@@ -36,8 +37,10 @@ case "$mode" in
     ;;
   stop)
     [ "$(cn_field "$payload" stop_hook_active)" = true ] && exit 0
+    case "$(cn_turn_origin "$(cn_field "$payload" transcript_path)")" in ""|human) ;; *) exit 0 ;; esac
     event=done
     ;;
+  ping) event=ping ;;
   clear)
     [ -f "$marker" ] || exit 0
     rm -f "$marker" 2>/dev/null
@@ -49,7 +52,7 @@ case "$mode" in
   *) exit 0 ;;
 esac
 
-record=$(cn_build_record "$event" "$payload")
+if [ "$event" = ping ]; then record=$(cn_build_ping "$2"); else record=$(cn_build_record "$event" "$payload"); fi
 
 if [ "$event" = done ]; then
   rm -f "$marker" 2>/dev/null

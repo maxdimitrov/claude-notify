@@ -103,6 +103,29 @@ assert_eq root_from_env_worktree quant-atelier "$(field root "$rec")"
 assert_eq projectdir_env_worktree 'f:/Claude/Projects/quant-atelier' "$(field projectdir "$rec")"
 unset CLAUDE_PROJECT_DIR
 
+# --- turn origin
+assert_eq origin_peer peer "$(cn_turn_origin "$FIX/transcript_origin_peer.jsonl")"
+assert_eq origin_task task-notification "$(cn_turn_origin "$FIX/transcript_origin_task.jsonl")"
+assert_eq origin_human human "$(cn_turn_origin "$FIX/transcript_origin_human.jsonl")"
+assert_eq origin_none '' "$(cn_turn_origin "$FIX/transcript_origin_none.jsonl")"
+assert_eq origin_missing '' "$(cn_turn_origin "$FIX/nope.jsonl")"
+assert_eq origin_empty_arg '' "$(cn_turn_origin '')"
+
+# --- ping record
+mkdir -p "$FIXROOT/home/.claude/projects/-x"
+cp "$FIX/transcript_titles.jsonl" "$FIXROOT/home/.claude/projects/-x/sess-ping-1.jsonl"
+rec=$(HOME="$FIXROOT/home" CLAUDE_CODE_SESSION_ID=sess-ping-1 CLAUDE_PROJECT_DIR=/p/my-repo cn_build_ping 'ready **to** test')
+assert_eq ping_event ping "$(field event "$rec")"
+assert_eq ping_title 'Claude needs you' "$(field title "$rec")"
+assert_eq ping_session sess-ping-1 "$(field session "$rec")"
+assert_eq ping_root my-repo "$(field root "$rec")"
+assert_eq ping_line2 'ready to test' "$(field line2 "$rec")"
+assert_has ping_tab ' - ' "$(field line1 "$rec")"
+
+# --- markdown strip keeps dunder names
+assert_eq md_dunder 'edit __init__.py now' "$(cn_clean_text 'edit __init__.py now')"
+assert_eq md_bold 'a bold b' "$(cn_clean_text 'a **bold** b')"
+
 # --- no jq: build a PATH without any dir that holds jq
 nojq=""
 oldifs=$IFS; IFS=:
