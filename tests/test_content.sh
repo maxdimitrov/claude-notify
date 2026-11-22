@@ -67,8 +67,14 @@ assert_eq rec_event permission "$(field event "$rec")"
 assert_has rec_line2_text 'Bash' "$(field line2 "$rec")"
 assert_lacks rec_line2_no_bold '**' "$(field line2 "$rec")"
 assert_has rec_line2_keeps_meta '<tag> & "q"' "$(field line2 "$rec")"
-assert_eq rec_line_count 8 "$(printf '%s\n' "$rec" | wc -l | tr -d ' ')"
-assert_eq rec_field_order 'event session root projectdir title tabtitle line1 line2' "$(printf '%s\n' "$rec" | sed 's/=.*//' | tr '\n' ' ' | sed 's/ $//')"
+assert_eq rec_line_count 11 "$(printf '%s\n' "$rec" | wc -l | tr -d ' ')"
+assert_eq rec_field_order 'event session entrypoint root rawroot projectdir title tabtitle line1 line2 marker' "$(printf '%s\n' "$rec" | sed 's/=.*//' | tr '\n' ' ' | sed 's/ $//')"
+assert_eq rec_entrypoint_empty '' "$(field entrypoint "$rec")"
+assert_eq rec_rawroot_plain fixture-repo "$(field rawroot "$rec")"
+assert_eq rec_marker_default '' "$(field marker "$rec")"
+rec=$(CLAUDE_CODE_ENTRYPOINT=claude-vscode cn_build_record permission "$(fx perm.json)" '/t/claude-notify/sess-perm-1.pending')
+assert_eq rec_entrypoint claude-vscode "$(field entrypoint "$rec")"
+assert_eq rec_marker '/t/claude-notify/sess-perm-1.pending' "$(field marker "$rec")"
 
 rec=$(cn_build_record question "$(fx question.json)")
 assert_has rec_question_title 'title=Claude has a question' "$rec"
@@ -92,6 +98,7 @@ assert_eq cyr_line2 "$(cat "$FIX/expected_cyr_msg.txt")" "$(field line2 "$rec")"
 # env vs cwd for root/projectdir
 rec=$(cn_build_record permission "$(fx winwt.json)")
 assert_eq root_from_cwd_worktree mailroom "$(field root "$rec")"
+assert_eq rawroot_cwd_worktree foo "$(field rawroot "$rec")"
 assert_eq projectdir_cwd_worktree 'F:\Claude\Projects\mailroom' "$(field projectdir "$rec")"
 CLAUDE_PROJECT_DIR='c:/Users/maxa2/claude'; export CLAUDE_PROJECT_DIR
 rec=$(cn_build_record permission "$(fx winwt.json)")
@@ -100,8 +107,48 @@ assert_eq projectdir_from_env 'c:/Users/maxa2/claude' "$(field projectdir "$rec"
 CLAUDE_PROJECT_DIR='f:/Claude/Projects/quant-atelier/.claude/worktrees/x'
 rec=$(cn_build_record permission "$(fx perm.json)")
 assert_eq root_from_env_worktree quant-atelier "$(field root "$rec")"
+assert_eq rawroot_env_worktree x "$(field rawroot "$rec")"
 assert_eq projectdir_env_worktree 'f:/Claude/Projects/quant-atelier' "$(field projectdir "$rec")"
 unset CLAUDE_PROJECT_DIR
+
+# --- permission tool, tokens, marker attributes
+assert_eq perm_tool_plain Bash "$(cn_perm_tool 'Claude needs your permission to use Bash')"
+assert_eq perm_tool_bold Bash "$(cn_perm_tool 'Claude needs your permission to use **Bash** with x')"
+assert_eq perm_tool_mcp mcp__gh__create_issue "$(cn_perm_tool 'Claude needs your permission to use mcp__gh__create_issue')"
+assert_eq perm_tool_none '' "$(cn_perm_tool 'Claude is waiting for your input')"
+assert_eq token_clean 'a_b_c' "$(cn_token 'a b;c')"
+assert_eq marker_attr_tool Bash "$(cn_marker_attr 'toast tool=Bash agent=ag1' tool)"
+assert_eq marker_attr_agent ag1 "$(cn_marker_attr 'toast tool=Bash agent=ag1' agent)"
+assert_eq marker_attr_missing '' "$(cn_marker_attr 'toast' tool)"
+
+# --- cn_should_clear: <marker> <event> <tool_name> <agent_id> -> yes/no
+sc() { if cn_should_clear "$1" "$2" "$3" "$4"; then echo yes; else echo no; fi; }
+assert_eq sc_toast_tool_match yes "$(sc 'toast tool=Bash' PostToolUse Bash '')"
+assert_eq sc_toast_tool_other no "$(sc 'toast tool=Bash' PostToolUse Read '')"
+assert_eq sc_toast_agent_match yes "$(sc 'toast tool=Bash agent=ag1' PostToolUse Bash ag1)"
+assert_eq sc_toast_agent_other no "$(sc 'toast tool=Bash agent=ag1' PostToolUse Bash ag2)"
+assert_eq sc_toast_agent_missing no "$(sc 'toast tool=Bash agent=ag1' PostToolUse Bash '')"
+assert_eq sc_toast_agent_only_match yes "$(sc 'toast agent=ag1' PostToolUse Read ag1)"
+assert_eq sc_toast_agent_only_other no "$(sc 'toast agent=ag1' PostToolUse Read '')"
+assert_eq sc_toast_bare yes "$(sc 'toast' PostToolUse Read '')"
+assert_eq sc_toast_prompt yes "$(sc 'toast tool=Bash agent=ag1' UserPromptSubmit '' '')"
+assert_eq sc_toast_denied yes "$(sc 'toast tool=Bash agent=ag1' PermissionDenied Read '')"
+assert_eq sc_toast_unknown_event no "$(sc 'toast tool=Bash' '' '' '')"
+assert_eq sc_toast_bare_unknown_event yes "$(sc 'toast' '' '' '')"
+assert_eq sc_question_ask yes "$(sc 'question' PostToolUse AskUserQuestion '')"
+assert_eq sc_question_other_tool no "$(sc 'question' PostToolUse Bash '')"
+assert_eq sc_question_denied no "$(sc 'question' PermissionDenied Bash '')"
+assert_eq sc_question_prompt yes "$(sc 'question' UserPromptSubmit '' '')"
+assert_eq sc_question_agent_other no "$(sc 'question agent=ag1' PostToolUse AskUserQuestion ag2)"
+assert_eq sc_ping_post no "$(sc 'ping' PostToolUse Bash '')"
+assert_eq sc_ping_denied no "$(sc 'ping' PermissionDenied Bash '')"
+assert_eq sc_ping_prompt yes "$(sc 'ping' UserPromptSubmit '' '')"
+
+# --- transcript cwd
+assert_eq tcwd_first 'C:\Users\u\Projects\from-transcript\.claude\worktrees\wt1' "$(cn_transcript_cwd "$FIX/transcript_cwd.jsonl")"
+assert_eq tcwd_none '' "$(cn_transcript_cwd "$FIX/transcript_titles.jsonl")"
+assert_eq tcwd_missing '' "$(cn_transcript_cwd "$FIX/nope.jsonl")"
+assert_eq tcwd_empty_arg '' "$(cn_transcript_cwd '')"
 
 # --- turn origin
 assert_eq origin_peer peer "$(cn_turn_origin "$FIX/transcript_origin_peer.jsonl")"
@@ -110,6 +157,12 @@ assert_eq origin_human human "$(cn_turn_origin "$FIX/transcript_origin_human.jso
 assert_eq origin_none '' "$(cn_turn_origin "$FIX/transcript_origin_none.jsonl")"
 assert_eq origin_missing '' "$(cn_turn_origin "$FIX/nope.jsonl")"
 assert_eq origin_empty_arg '' "$(cn_turn_origin '')"
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*)
+  # payload transcript_path arrives with backslashes on Windows
+  wp=$(cygpath -w "$FIX/transcript_origin_peer.jsonl")
+  assert_eq origin_backslash_path peer "$(cn_turn_origin "$wp")" ;;
+esac
+assert_eq origin_backslash_relative peer "$(cd "$FIX/.." && cn_turn_origin 'fixtures\transcript_origin_peer.jsonl')"
 
 # --- ping record
 mkdir -p "$FIXROOT/home/.claude/projects/-x"
@@ -121,6 +174,20 @@ assert_eq ping_session sess-ping-1 "$(field session "$rec")"
 assert_eq ping_root my-repo "$(field root "$rec")"
 assert_eq ping_line2 'ready to test' "$(field line2 "$rec")"
 assert_has ping_tab ' - ' "$(field line1 "$rec")"
+assert_eq ping_marker_default '' "$(field marker "$rec")"
+# Bash tool env: no CLAUDE_PROJECT_DIR, cwd elsewhere -> project dir from the transcript's cwd
+cp "$FIX/transcript_cwd.jsonl" "$FIXROOT/home/.claude/projects/-x/sess-cwd-1.jsonl"
+mkdir -p "$FIXROOT/elsewhere/wrong-repo"
+rec=$(cd "$FIXROOT/elsewhere/wrong-repo" && HOME="$FIXROOT/home" CLAUDE_CODE_SESSION_ID=sess-cwd-1 cn_build_ping 'done' "$FIXROOT/m.pending")
+assert_eq ping_cwd_root from-transcript "$(field root "$rec")"
+assert_eq ping_cwd_rawroot wt1 "$(field rawroot "$rec")"
+assert_eq ping_cwd_projectdir 'C:\Users\u\Projects\from-transcript' "$(field projectdir "$rec")"
+assert_eq ping_cwd_line1 'from-transcript - Cwd Tab' "$(field line1 "$rec")"
+assert_eq ping_cwd_marker "$FIXROOT/m.pending" "$(field marker "$rec")"
+rec=$(cd "$FIXROOT/elsewhere/wrong-repo" && HOME="$FIXROOT/home" CLAUDE_CODE_SESSION_ID=sess-cwd-1 CLAUDE_PROJECT_DIR=/p/env-repo cn_build_ping 'done')
+assert_eq ping_env_beats_transcript env-repo "$(field root "$rec")"
+rec=$(cd "$FIXROOT/elsewhere/wrong-repo" && HOME="$FIXROOT/home" CLAUDE_CODE_SESSION_ID=sess-none cn_build_ping 'done')
+assert_eq ping_pwd_last wrong-repo "$(field root "$rec")"
 
 # --- markdown strip keeps dunder names
 assert_eq md_dunder 'edit __init__.py now' "$(cn_clean_text 'edit __init__.py now')"
@@ -144,6 +211,7 @@ else
   assert_eq no_jq_session sess-nt-1 "$(field session "$rec")"
   rec=$(PATH="$nojq" cn_build_record permission "$(fx winwt.json)")
   assert_eq no_jq_cwd_worktree mailroom "$(field root "$rec")"
+  assert_eq no_jq_tcwd 'C:\Users\u\Projects\from-transcript\.claude\worktrees\wt1' "$(PATH="$nojq" cn_transcript_cwd "$FIX/transcript_cwd.jsonl")"
 fi
 
 rm -rf "$FIXROOT"

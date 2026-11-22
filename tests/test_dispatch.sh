@@ -55,17 +55,95 @@ assert_log_empty unattended_skipped
 reset; rc=$(run clear perm.json)
 assert_rc0 clear_without_marker_rc "$rc"; assert_log_empty clear_without_marker
 
-reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
-rc=$(run clear perm.json)
-assert_rc0 clear_with_marker_rc "$rc"
-assert_log_has clear_args '^clear sess-perm-1 fixture-repo$'
-[ ! -f "$MARK/sess-perm-1.pending" ] && ok clear_marker_removed || bad clear_marker_removed "marker still there"
+# clear events: <event> [session] [tool_name] [agent_id] -> dispatch clear
+clearev() {
+  _ag=; [ -n "$4" ] && _ag=",\"agent_id\":\"$4\""
+  printf '{"session_id":"%s","cwd":"%s/fixture-repo","hook_event_name":"%s","tool_name":"%s"%s}' \
+    "${2:-sess-perm-1}" "$FIX" "$1" "$3" "$_ag" | sh "$DISPATCH" clear
+}
+mk() { cat "$MARK/${1:-sess-perm-1}.pending" 2>/dev/null; }
+kept() { [ -f "$MARK/${2:-sess-perm-1}.pending" ] && ok "$1" || bad "$1" "marker gone"; }
+gone() { [ ! -f "$MARK/${2:-sess-perm-1}.pending" ] && ok "$1" || bad "$1" "marker still there: $(mk "$2")"; }
 
-# clear uses env project dir for the root name
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
+rc=$(clearev UserPromptSubmit; echo $?)
+assert_rc0 clear_with_marker_rc "$rc"
+assert_log_has clear_args '^clear sess-perm-1 fixture-repo fixture-repo$'
+gone clear_marker_removed
+
+# clear uses env project dir for the root name; rawroot is the uncut leaf
 reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
 CLAUDE_PROJECT_DIR='c:/Users/maxa2/claude'; export CLAUDE_PROJECT_DIR
-run clear perm.json >/dev/null
-assert_log_has clear_env_root '^clear sess-perm-1 claude$'
+clearev UserPromptSubmit
+assert_log_has clear_env_root '^clear sess-perm-1 claude claude$'
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
+CLAUDE_PROJECT_DIR='f:/Claude/Projects/repo/.claude/worktrees/wt1'; export CLAUDE_PROJECT_DIR
+clearev UserPromptSubmit
+assert_log_has clear_worktree_rawroot '^clear sess-perm-1 repo wt1$'
+
+# --- marker contents and selective PostToolUse clear (finding: unrelated tools cleared the toast)
+reset; run notify perm.json >/dev/null
+[ "$(mk)" = 'toast tool=Bash' ] && ok marker_perm_tool || bad marker_perm_tool "marker: [$(mk)]"
+reset; fx perm.json | sed 's/"notification_type"/"agent_id":"ag1","notification_type"/' | sh "$DISPATCH" notify
+[ "$(mk)" = 'toast tool=Bash agent=ag1' ] && ok marker_perm_agent || bad marker_perm_agent "marker: [$(mk)]"
+reset; run notify question.json >/dev/null
+[ "$(mk sess-q-1)" = 'question' ] && ok marker_question || bad marker_question "marker: [$(mk sess-q-1)]"
+
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
+clearev PostToolUse sess-perm-1 Read
+assert_log_empty post_other_tool_no_clear; kept post_other_tool_marker_kept
+clearev PostToolUse sess-perm-1 Bash
+assert_log_has post_same_tool_clears '^clear sess-perm-1 '; gone post_same_tool_marker_gone
+
+reset; fx perm.json | sed 's/"notification_type"/"agent_id":"ag1","notification_type"/' | sh "$DISPATCH" notify; : > "$STUB_LOG"
+clearev PostToolUse sess-perm-1 Bash ag2
+assert_log_empty post_other_agent_no_clear; kept post_other_agent_marker_kept
+clearev PostToolUse sess-perm-1 Bash
+assert_log_empty post_main_thread_no_clear; kept post_main_thread_marker_kept
+clearev PostToolUse sess-perm-1 Bash ag1
+assert_log_has post_same_agent_clears '^clear sess-perm-1 '; gone post_same_agent_marker_gone
+
+reset; mkdir -p "$MARK"; echo toast > "$MARK/sess-perm-1.pending"
+clearev PostToolUse sess-perm-1 Read
+assert_log_has post_bare_marker_clears '^clear sess-perm-1 '
+
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
+clearev PermissionDenied sess-perm-1 Read
+assert_log_has denied_clears_toast '^clear sess-perm-1 '; gone denied_marker_gone
+
+reset; run notify question.json >/dev/null; : > "$STUB_LOG"
+clearev PostToolUse sess-q-1 Bash
+clearev PermissionDenied sess-q-1 Bash
+assert_log_empty question_kept_by_other_events; kept question_marker_kept sess-q-1
+clearev PostToolUse sess-q-1 AskUserQuestion
+assert_log_has question_ask_clears '^clear sess-q-1 '; gone question_ask_marker_gone sess-q-1
+reset; run notify question.json >/dev/null; : > "$STUB_LOG"
+clearev UserPromptSubmit sess-q-1
+assert_log_has question_prompt_clears '^clear sess-q-1 '
+
+# --- record carries entrypoint, rawroot and the marker path (empty for done)
+reset; run notify perm.json >/dev/null
+assert_log_has record_entrypoint '^entrypoint=claude-vscode$'
+assert_log_has record_rawroot '^rawroot=fixture-repo$'
+assert_log_has record_marker '^marker=.*sess-perm-1\.pending$'
+reset; run stop stop.json >/dev/null
+assert_log_has record_done_marker_empty '^marker=$'
+
+# --- cheap clear: no marker at all -> the payload is never parsed (no jq run)
+realjq=$(command -v jq)
+if [ -n "$realjq" ]; then
+  mkdir -p "$FIXROOT/jqspy"; JQLOG="$FIXROOT/jq.log"; export JQLOG REALJQ="$realjq"
+  printf '#!/bin/sh\necho JQ >> "$JQLOG"\nexec "$REALJQ" "$@"\n' > "$FIXROOT/jqspy/jq"; chmod +x "$FIXROOT/jqspy/jq"
+  reset; : > "$JQLOG"
+  fx perm.json | sed 's/"Notification"/"PostToolUse"/' | PATH="$FIXROOT/jqspy:$PATH" sh "$DISPATCH" clear
+  [ -s "$JQLOG" ] && bad clear_no_marker_no_jq "jq ran $(wc -l < "$JQLOG") times" || ok clear_no_marker_no_jq
+  mkdir -p "$MARK"; echo toast > "$MARK/other-session.pending"; : > "$JQLOG"
+  fx perm.json | sed 's/"Notification"/"PostToolUse"/' | PATH="$FIXROOT/jqspy:$PATH" sh "$DISPATCH" clear
+  [ -s "$JQLOG" ] && ok clear_other_marker_parses || bad clear_other_marker_parses "jq never ran (spy broken?)"
+  assert_log_empty clear_other_session_untouched
+else
+  echo "SKIP clear_no_marker_no_jq (no jq)"
+fi
 
 # env wins in the record too
 reset; CLAUDE_PROJECT_DIR='f:/Claude/Projects/quant-atelier'; export CLAUDE_PROJECT_DIR
@@ -117,8 +195,21 @@ reset; pingrun x >/dev/null; : > "$STUB_LOG"
 fx perm.json | sed 's/sess-perm-1/sess-ping-1/; s/"Notification"/"UserPromptSubmit"/' | sh "$DISPATCH" clear
 assert_log_has ping_prompt_clears '^clear sess-ping-1 '
 [ ! -f "$MARK/sess-ping-1.pending" ] && ok ping_prompt_marker_gone || bad ping_prompt_marker_gone "marker still there"
-reset; run notify perm.json >/dev/null; : > "$STUB_LOG"; clearas PostToolUse
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"; clearev PostToolUse sess-perm-1 Bash
 assert_log_has perm_post_tool_clears '^clear sess-perm-1 '
+
+# --- the turn's own done after a ping: no second notification, ping marker kept
+reset; pingrun x >/dev/null; : > "$STUB_LOG"
+fx stop.json | sed 's/sess-stop-1/sess-ping-1/' | sh "$DISPATCH" stop
+assert_log_empty stop_after_ping_silent
+[ "$(mk sess-ping-1)" = ping ] && ok stop_after_ping_marker_kept || bad stop_after_ping_marker_kept "marker: [$(mk sess-ping-1)]"
+reset; run notify perm.json >/dev/null; : > "$STUB_LOG"
+fx stop.json | sed 's/sess-stop-1/sess-perm-1/' | sh "$DISPATCH" stop
+assert_log_has stop_after_toast_notifies 'event=done'
+
+# --- ping record: marker path in the record
+reset; pingrun x >/dev/null
+assert_log_has ping_record_marker '^marker=.*sess-ping-1\.pending$'
 
 # --- R6a: unreadable content.sh exits 0 (copy dispatch.sh alone)
 mkdir -p "$FIXROOT/lone/scripts"; cp "$DISPATCH" "$FIXROOT/lone/scripts/dispatch.sh"
