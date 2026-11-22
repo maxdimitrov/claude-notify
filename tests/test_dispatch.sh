@@ -109,8 +109,8 @@ reset; CLAUDE_CODE_SESSION_ATTENDED=0; export CLAUDE_CODE_SESSION_ATTENDED
 rc=$(pingrun x); assert_log_empty ping_unattended_skipped
 
 # --- ping survives its own PostToolUse clear
-clearas() { fx perm.json | sed "s/\"Notification\"/\"$1\"/" | sh "$DISPATCH" clear; }
-reset; pingrun x >/dev/null; : > "$STUB_LOG"; clearas PostToolUse
+clearas() { fx perm.json | sed "s/sess-perm-1/${2:-sess-perm-1}/; s/\"Notification\"/\"$1\"/" | sh "$DISPATCH" clear; }
+reset; pingrun x >/dev/null; : > "$STUB_LOG"; clearas PostToolUse sess-ping-1
 assert_log_empty ping_post_tool_no_clear
 [ -f "$MARK/sess-ping-1.pending" ] && ok ping_post_tool_marker_kept || bad ping_post_tool_marker_kept "marker gone"
 reset; pingrun x >/dev/null; : > "$STUB_LOG"
