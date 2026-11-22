@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stub backend: logs "notify" and its stdin to $STUB_LOG.
+{
+  echo "notify"
+  cat
+  echo "--"
+} >> "${STUB_LOG:-/dev/null}"
+exit 0

@@ -1,0 +1,1 @@
+{"session_id":"sess-cyr-1","transcript_path":"@FIXTURES@/transcript_cyr.jsonl","cwd":"@FIXTURES@/fixture-repo","hook_event_name":"Notification","message":"Нужно е разрешение","notification_type":"permission_prompt"}

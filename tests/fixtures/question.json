@@ -1,0 +1,1 @@
+{"session_id":"sess-q-1","transcript_path":"@FIXTURES@/transcript_titles.jsonl","cwd":"@FIXTURES@/fixture-repo","hook_event_name":"Notification","message":"Which option do you prefer?","notification_type":"elicitation_dialog"}
