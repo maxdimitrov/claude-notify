@@ -31,7 +31,10 @@ function Get-CnLink([hashtable]$Record) {
         '&session=' + [Uri]::EscapeDataString("$($Record['session'])")
 }
 
-function ConvertTo-CnXml([string]$s) { return [System.Security.SecurityElement]::Escape($s) }
+function ConvertTo-CnXml([string]$s) {
+    $s = [regex]::Replace($s, '[\x00-\x08\x0B\x0C\x0E-\x1F]', '')
+    return [System.Security.SecurityElement]::Escape($s)
+}
 
 function New-CnToastXml([hashtable]$Record, [string]$Link) {
     $l = ConvertTo-CnXml $Link
@@ -57,7 +60,8 @@ function Test-CnWatching([string]$ForegroundTitle, [string]$Root, [string]$TabTi
     $tail = " - $Root - Visual Studio Code"
     if (-not $ForegroundTitle.EndsWith($tail, [StringComparison]::OrdinalIgnoreCase)) { return $false }
     $first = ($ForegroundTitle -split ' - ', 2)[0]
-    if ($first.EndsWith('...')) { $first = $first.Substring(0, $first.Length - 3) }
+    if ($first.EndsWith([string][char]0x2026)) { $first = $first.Substring(0, $first.Length - 1) }
+    elseif ($first.EndsWith('...')) { $first = $first.Substring(0, $first.Length - 3) }
     elseif ($first.EndsWith('.')) { $first = $first.Substring(0, $first.Length - 1) }
     if (-not $first) { return $false }
     return $TabTitle.StartsWith($first, [StringComparison]::OrdinalIgnoreCase)

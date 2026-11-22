@@ -1,0 +1,5 @@
+#!/bin/sh
+# claude-notify Windows backend shim: record on stdin -> Notify.ps1. Always exits 0.
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || exit 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w "$here/Notify.ps1")" >/dev/null 2>&1
+exit 0

@@ -55,7 +55,12 @@ $e = [xml](New-CnToastXml @{ event = 'done'; title = 't'; line1 = 'l'; line2 = $
 Assert-Eq 'escaped text roundtrip' (@($e.toast.visual.binding.text)[2]) $raw
 Assert-Eq 'escaped link roundtrip' $e.toast.launch 'claude-focus:?root=a&session=b'
 
+$esc = [string][char]27
+$cx = [xml](New-CnToastXml @{ event = 'done'; title = 't'; line1 = 'l'; line2 = ($esc + '[31mred' + $esc + '[0m' + [char]7 + 'x') } 'l')
+Assert-Eq 'control chars stripped' (@($cx.toast.visual.binding.text)[2]) '[31mred[0mx'
+
 # Test-CnWatching
+Assert-True 'watch unicode ellipsis' (Test-CnWatching ('Desktop and audio' + [char]0x2026 + ' - claude - Visual Studio Code') 'claude' 'Desktop and audio notifications')
 Assert-True 'watch truncated title' (Test-CnWatching 'Desktop and audio notifi. - claude - Visual Studio Code' 'claude' 'Desktop and audio notifications for input')
 Assert-True 'watch exact title' (Test-CnWatching 'Notifications - claude - Visual Studio Code' 'claude' 'Notifications')
 Assert-True 'watch case-insensitive' (Test-CnWatching 'notifications - CLAUDE - visual studio code' 'claude' 'Notifications')
