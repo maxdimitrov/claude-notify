@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "Notification": [
+      { "matcher": "permission_prompt|elicitation_dialog", "hooks": [ {"type":"command","command":"sh \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" notify","timeout":15,"async":true} ] }
+    ],
+    "Stop": [
+      { "hooks": [ {"type":"command","command":"sh \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" stop","timeout":15,"async":true} ] }
+    ],
+    "PostToolUse": [
+      { "hooks": [ {"type":"command","command":"sh \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" clear","timeout":15,"async":true} ] }
+    ],
+    "PermissionDenied": [
+      { "hooks": [ {"type":"command","command":"sh \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" clear","timeout":15,"async":true} ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ {"type":"command","command":"sh \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" clear","timeout":15,"async":true} ] }
+    ]
+  }
+}
