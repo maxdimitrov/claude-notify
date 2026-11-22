@@ -92,6 +92,7 @@ assert_eq cyr_line2 "$(cat "$FIX/expected_cyr_msg.txt")" "$(field line2 "$rec")"
 # env vs cwd for root/projectdir
 rec=$(cn_build_record permission "$(fx winwt.json)")
 assert_eq root_from_cwd_worktree mailroom "$(field root "$rec")"
+assert_eq projectdir_cwd_worktree 'F:\Claude\Projects\mailroom' "$(field projectdir "$rec")"
 CLAUDE_PROJECT_DIR='c:/Users/maxa2/claude'; export CLAUDE_PROJECT_DIR
 rec=$(cn_build_record permission "$(fx winwt.json)")
 assert_eq root_from_env claude "$(field root "$rec")"
@@ -99,6 +100,7 @@ assert_eq projectdir_from_env 'c:/Users/maxa2/claude' "$(field projectdir "$rec"
 CLAUDE_PROJECT_DIR='f:/Claude/Projects/quant-atelier/.claude/worktrees/x'
 rec=$(cn_build_record permission "$(fx perm.json)")
 assert_eq root_from_env_worktree quant-atelier "$(field root "$rec")"
+assert_eq projectdir_env_worktree 'f:/Claude/Projects/quant-atelier' "$(field projectdir "$rec")"
 unset CLAUDE_PROJECT_DIR
 
 # --- no jq: build a PATH without any dir that holds jq

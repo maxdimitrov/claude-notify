@@ -94,6 +94,6 @@ cn_build_record() {
   if [ -n "$_cn_tab" ]; then _cn_l1="$_cn_name - $_cn_tab"; else _cn_l1=$_cn_name; fi
   # values must be single-line
   printf 'event=%s\nsession=%s\nroot=%s\nprojectdir=%s\ntitle=%s\ntabtitle=%s\nline1=%s\nline2=%s\n' \
-    "$_cn_ev" "$_cn_sid" "$_cn_name" "$_cn_dir" "$(cn_event_title "$_cn_ev")" \
+    "$_cn_ev" "$_cn_sid" "$_cn_name" "$(cn_repo_root "$_cn_dir")" "$(cn_event_title "$_cn_ev")" \
     "$(printf '%s' "$_cn_tab" | tr '\n' ' ')" "$(printf '%s' "$_cn_l1" | tr '\n' ' ')" "$_cn_l2"
 }
