@@ -185,6 +185,19 @@ otify.log`); `Register-CnHandlers` with the plugin root (two levels up from `$PS
 - [ ] **Step 5: Mark unverified:** README "macOS" section lists the real-Mac check (install `brew install terminal-notifier`, set terminal-notifier to Alerts in System Settings > Notifications, click from another window) as pending.
 - [ ] **Step 6: ASCII check; commit** `feat(mac): terminal-notifier backend and focus`.
 
+### Task 5b: Background-turn filter and deliberate ping
+
+**Files:**
+- Modify: `scripts/lib/content.sh`, `scripts/dispatch.sh`, `tests/test_content.sh`, `tests/test_dispatch.sh`, `tests/fixtures/` (new transcripts), `scripts/windows/Common.ps1` + `tests/windows/Run-Tests.ps1` (title for `ping`), `scripts/mac/notify` (+ its test) and `scripts/linux/notify` if present (treat `ping` like `question`)
+
+**Interfaces:**
+- Produces: `cn_turn_origin <transcript_path>` -> last `origin.kind` in the transcript tail (same 4 MB cap), empty if none. `dispatch.sh ping "<message>"`: builds the record from env instead of stdin (session = `CLAUDE_CODE_SESSION_ID`, project dir = `CLAUDE_PROJECT_DIR` else `$PWD`, transcript = newest `*.jsonl` named `<session>.jsonl` under `$HOME/.claude/projects/*/` if found), `event=ping`, `title=Claude needs you`, `line2=<message>` (cleaned like other line2s); writes the marker like permission/question.
+
+- [ ] **Step 1: Fixtures + failing tests.** Transcripts ending in origin `peer`, `task-notification`, `human`, and one with no origin. Tests: `cn_turn_origin` returns each kind / empty; dispatcher `stop` with the peer and task-notification transcripts -> stub not called; with human and with no-origin -> called; `notify` (permission) with the peer transcript -> still called; `ping "ready to test"` with env set -> stub got `event=ping`, `title=Claude needs you`, `line2=ready to test`, marker written; `ping` honors the headless guards.
+- [ ] **Step 2: Run** `sh tests/run.sh` -> FAIL. **Step 3: Implement.** Match `"origin":{"kind":"..."}` exactly as Claude Code writes it (no spaces); fail open.
+- [ ] **Step 4: Backends treat `ping` like `question`:** Windows `New-CnToastXml` reminder scenario + "Go to session" for `ping` (test), sound as permission; macOS sound as permission (test); Linux urgency critical.
+- [ ] **Step 5: Run** both suites -> PASS; ASCII check; commit `feat: skip done for background turns; add deliberate ping`.
+
 ### Task 6: Linux backend (minimal)
 
 **Files:**
