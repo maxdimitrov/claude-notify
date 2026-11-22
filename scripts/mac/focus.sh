@@ -26,14 +26,18 @@ reveal() {
   esac
 }
 
-if name=$(osascript -e 'tell application "System Events" to get name of front window of (first process whose frontmost is true)' 2>/dev/null); then
-  if cn_has_any_seg "$name" "$root"; then
-    reveal guarded
-  else
-    cn_log "focus: skipped (front window '$name' is not '$root')"
-  fi
+if _out=$(osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to return (name & "|" & (name of front window))' 2>/dev/null); then
+  _app=${_out%%|*}; name=${_out#*|}
+  case "$_app" in
+    Code*|Electron)
+      if cn_has_any_seg "$name" "$root"; then
+        reveal guarded
+      else
+        cn_log "focus: skipped (front window '$name' is not '$root')"
+      fi ;;
+    *) cn_log "focus: skipped (frontmost app '$_app' is not VS Code)" ;;
+  esac
 else
-  cn_log "focus: unguarded (osascript error, no Accessibility?) root=$root"
   reveal unguarded
 fi
 exit 0

@@ -65,6 +65,7 @@ case "$exec_str" in *touch*|*'"q"'*|*'needs permission'*) bad execute_only_dir_s
 PATH="$W/bin:$BASEPATH" sh -c "$exec_str"
 has exec_focus_ran_code 'CALL code'
 has exec_projectdir "ARG $PD"
+has exec_session "ARG vscode://anthropic.claude-code/open?session=$SID"
 [ -e /tmp/pwned ] && { bad exec_no_injection "/tmp/pwned created"; rm -f /tmp/pwned; } || ok exec_no_injection
 
 # 2. done uses Glass
@@ -110,14 +111,18 @@ reset; PATH="$W/bin:$BASEPATH" sh "$MAC/clear" "$SID" repo; has clear_remove 'AR
 
 # 6. focus.sh
 export OSA_MODE=ok OSA_OUT="Code|x"
-reset; export OSA_MODE=ok OSA_OUT="file.txt $EM it's repo $EM Visual Studio Code"
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt $EM it's repo $EM Visual Studio Code"
 PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
 has focus_code "ARG $PD"
 has focus_open "ARG vscode://anthropic.claude-code/open?session=$SID"
-reset; export OSA_MODE=ok OSA_OUT="file.txt - other - Visual Studio Code"
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - other - Visual Studio Code"
 PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
 hasnt focus_skip_other 'CALL open'
 grep -q skipped "$TMPDIR/claude-notify/mac.log" && ok focus_skip_logged || bad focus_skip_logged "no log"
+reset; export OSA_MODE=ok OSA_OUT="Terminal|it's repo $EM -zsh"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+hasnt focus_terminal_no_open "ARG vscode://anthropic.claude-code/open?session=$SID"
+grep -q skipped "$TMPDIR/claude-notify/mac.log" && ok focus_terminal_skip_logged || bad focus_terminal_skip_logged "no log"
 reset  # osascript error -> unguarded
 PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
 has focus_unguarded_open "ARG vscode://anthropic.claude-code/open?session=$SID"
