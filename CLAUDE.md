@@ -11,7 +11,9 @@ Claude Code plugin `claude-notify`: desktop notifications (sound + toast naming 
 
 ## Tests
 
-TBD (added with the test tasks).
+- `sh tests/run.sh` runs the POSIX suites (content, dispatch, linux, mac; PATH stubs in `tests/stub/`, fixtures in `tests/fixtures/`). Run under Git Bash, `sh` or `dash`.
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows/Run-Tests.ps1` runs the Windows PowerShell 5.1 suite.
+- Run both before committing. The mac backend is only tested with PATH stubs (no real-Mac check yet).
 
 ## Verified environment
 
