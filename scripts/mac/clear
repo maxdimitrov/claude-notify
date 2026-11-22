@@ -1,0 +1,9 @@
+#!/bin/sh
+# claude-notify macOS backend: clear <session> <root> -> remove the session notification.
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || exit 0
+. "$here/lib.sh" 2>/dev/null || exit 0
+if command -v terminal-notifier >/dev/null 2>&1; then
+  terminal-notifier -remove "$1" >/dev/null 2>&1
+fi
+cn_log "clear session=$1 root=$2"
+exit 0
