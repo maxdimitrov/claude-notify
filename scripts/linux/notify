@@ -1,0 +1,27 @@
+#!/bin/sh
+# claude-notify Linux backend: record on stdin -> notify-send + sound. Always exits 0.
+event=; title=; line1=; line2=
+while IFS= read -r _l || [ -n "$_l" ]; do
+  _k=${_l%%=*}; _v=${_l#*=}
+  case "$_k" in
+    event) event=$_v ;; title) title=$_v ;; line1) line1=$_v ;; line2) line2=$_v ;;
+  esac
+done
+
+command -v notify-send >/dev/null 2>&1 || exit 0
+
+case "$event" in
+  done) urgency=normal; snd=complete ;;
+  *) urgency=critical; snd=dialog-warning ;;
+esac
+
+body=$(printf '%s\n%s' "$line1" "$line2")
+notify-send -a "Claude Code" -u "$urgency" "$title" "$body" >/dev/null 2>&1
+
+sdir=${CLAUDE_NOTIFY_SOUND_DIR:-/usr/share/sounds/freedesktop/stereo}
+if command -v paplay >/dev/null 2>&1 && [ -f "$sdir/$snd.oga" ]; then
+  paplay "$sdir/$snd.oga" >/dev/null 2>&1
+elif command -v canberra-gtk-play >/dev/null 2>&1; then
+  canberra-gtk-play -i "$snd" >/dev/null 2>&1
+fi
+exit 0
