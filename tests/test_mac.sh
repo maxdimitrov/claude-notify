@@ -40,9 +40,10 @@ hasnt() { if grep -qxF -- "$2" "$LOG"; then bad "$1" "unexpected [$2] in:" "$(ca
 
 SID=11111111-2222-3333-4444-555555555555
 PD="$W/my proj/it's repo"; mkdir -p "$PD"
-rec() { # event line1 line2 [tabtitle]
-  printf 'event=%s\nsession=%s\nroot=%s\nprojectdir=%s\ntitle=Claude needs permission\ntabtitle=%s\nline1=%s\nline2=%s\n' \
-    "$1" "$SID" "it's repo" "$PD" "$4" "$2" "$3"
+RN="it's repo"
+rec() { # event line1 line2 [tabtitle]; env EP (default claude-vscode), RAW (default root)
+  printf 'event=%s\nsession=%s\nentrypoint=%s\nroot=%s\nrawroot=%s\nprojectdir=%s\ntitle=Claude needs permission\ntabtitle=%s\nline1=%s\nline2=%s\nmarker=\n' \
+    "$1" "$SID" "${EP-claude-vscode}" "$RN" "${RAW-$RN}" "$PD" "$4" "$2" "$3"
 }
 run_notify() { PATH="$W/bin:$BASEPATH" sh "$MAC/notify" 2>"$W/stderr"; echo $?; }
 run_notify2() { PATH="$W/bin2:$BASEPATH" sh "$MAC/notify" 2>"$W/stderr"; echo $?; }
@@ -68,6 +69,24 @@ has exec_projectdir "ARG $PD"
 has exec_session "ARG vscode://anthropic.claude-code/open?session=$SID"
 [ -e /tmp/pwned ] && { bad exec_no_injection "/tmp/pwned created"; rm -f /tmp/pwned; } || ok exec_no_injection
 
+# 1b. entrypoint and rawroot travel in the -execute command; a terminal session gets no reveal
+reset; EP=cli RAW=wt1 rec permission "l1" "l2" "" | run_notify >/dev/null
+exec_str=$(grep -A1 -x 'ARG -execute' "$LOG" | tail -1 | sed 's/^ARG //')
+case "$exec_str" in *"'cli' 'wt1'") ok exec_carries_ep_raw ;; *) bad exec_carries_ep_raw "execute: $exec_str" ;; esac
+: > "$LOG"
+PATH="$W/bin:$BASEPATH" sh -c "$exec_str"
+has exec_cli_focuses 'CALL code'
+hasnt exec_cli_no_reveal "ARG vscode://anthropic.claude-code/open?session=$SID"
+grep -q 'no reveal: entrypoint=cli' "$TMPDIR/claude-notify/mac.log" && ok exec_cli_logged || bad exec_cli_logged "$(cat "$TMPDIR/claude-notify/mac.log")"
+
+# 1c. empty line2 never reaches -message (terminal-notifier would print usage)
+reset; rec permission "repo - tab" "" "" | run_notify >/dev/null
+msg=$(grep -A1 -x 'ARG -message' "$LOG" | tail -1)
+[ "$msg" = 'ARG repo - tab' ] && ok empty_line2_uses_line1 || bad empty_line2_uses_line1 "got [$msg]"
+reset; rec permission "" "" "" | run_notify >/dev/null
+msg=$(grep -A1 -x 'ARG -message' "$LOG" | tail -1)
+[ "$msg" = 'ARG Claude needs permission' ] && ok empty_lines_use_title || bad empty_lines_use_title "got [$msg]"
+
 # 2a. ping uses Ping
 reset; rec ping "r" "m" "" | run_notify >/dev/null
 has ping_sound 'ARG Ping'
@@ -86,6 +105,7 @@ has fb_afplay_path 'ARG /System/Library/Sounds/Ping.aiff'
 hasnt fb_no_tn 'CALL terminal-notifier'
 [ -f "$TMPDIR/claude-notify/hint-shown" ] && ok hint_marker || bad hint_marker "no marker"
 grep -q terminal-notifier "$W/stderr" && ok hint_printed || bad hint_printed "stderr: $(cat "$W/stderr")"
+grep -q 'hint: claude-notify: terminal-notifier not found' "$TMPDIR/claude-notify/mac.log" && ok hint_logged || bad hint_logged "$(cat "$TMPDIR/claude-notify/mac.log")"
 rec permission "l1" "l2" "" | run_notify2 >/dev/null
 [ -s "$W/stderr" ] && bad hint_once "hint printed twice" || ok hint_once
 
@@ -109,31 +129,54 @@ has other_root_notifies 'CALL terminal-notifier'
 reset  # osascript error: notify normally
 rec permission "it's repo - tab title" "m" "tab title" | run_notify >/dev/null
 has osa_error_notifies 'CALL terminal-notifier'
+reset; export OSA_MODE=ok OSA_OUT="Code|tab title - wt1 - Visual Studio Code"  # worktree window
+RAW=wt1 rec permission "it's repo - tab title" "m" "tab title" | run_notify >/dev/null
+hasnt watching_rawroot_silent 'CALL terminal-notifier'
+reset; export OSA_MODE=ok OSA_OUT="Code|tab title - wt1 - Visual Studio Code"
+rec permission "it's repo - tab title" "m" "tab title" | run_notify >/dev/null
+has watching_other_rawroot_notifies 'CALL terminal-notifier'
 
 # 5. clear
 reset; PATH="$W/bin:$BASEPATH" sh "$MAC/clear" "$SID" repo; has clear_remove 'ARG -remove'; has clear_session "ARG $SID"
 
 # 6. focus.sh
 export OSA_MODE=ok OSA_OUT="Code|x"
+VS=claude-vscode
 reset; export OSA_MODE=ok OSA_OUT="Code|file.txt $EM it's repo $EM Visual Studio Code"
-PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS"
 has focus_code "ARG $PD"
 has focus_open "ARG vscode://anthropic.claude-code/open?session=$SID"
 reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - other - Visual Studio Code"
-PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS"
 hasnt focus_skip_other 'CALL open'
 grep -q skipped "$TMPDIR/claude-notify/mac.log" && ok focus_skip_logged || bad focus_skip_logged "no log"
 reset; export OSA_MODE=ok OSA_OUT="Terminal|it's repo $EM -zsh"
-PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS"
 hasnt focus_terminal_no_open "ARG vscode://anthropic.claude-code/open?session=$SID"
 grep -q skipped "$TMPDIR/claude-notify/mac.log" && ok focus_terminal_skip_logged || bad focus_terminal_skip_logged "no log"
 reset  # osascript error -> unguarded
-PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS"
 has focus_unguarded_open "ARG vscode://anthropic.claude-code/open?session=$SID"
 grep -q unguarded "$TMPDIR/claude-notify/mac.log" && ok focus_unguarded_logged || bad focus_unguarded_logged "no log"
 reset  # bad session: no link
-PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" 'x;rm -rf'
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" 'x;rm -rf' "$VS"
 hasnt focus_bad_session 'CALL open'
+# entrypoint: only claude-vscode reveals (terminal session, or an old link without one)
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - it's repo - Visual Studio Code"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" cli
+has focus_cli_code "ARG $PD"
+hasnt focus_cli_no_open 'CALL open'
+grep -q 'no reveal: entrypoint=cli' "$TMPDIR/claude-notify/mac.log" && ok focus_cli_logged || bad focus_cli_logged "no log"
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - it's repo - Visual Studio Code"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID"
+hasnt focus_no_ep_no_open 'CALL open'
+# guard accepts the worktree folder name (rawroot) as well as the repo root
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - wt1 - Visual Studio Code"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS" wt1
+has focus_rawroot_open "ARG vscode://anthropic.claude-code/open?session=$SID"
+reset; export OSA_MODE=ok OSA_OUT="Code|file.txt - wt1 - Visual Studio Code"
+PATH="$W/bin:$BASEPATH" sh "$MAC/focus.sh" "$PD" "$SID" "$VS" other
+hasnt focus_other_rawroot_skip 'CALL open'
 
 rm -rf "$W"
 if [ "$fails" = 0 ]; then echo "mac: PASS"; exit 0; else echo "mac: $fails FAILED"; exit 1; fi
