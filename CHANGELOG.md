@@ -8,4 +8,5 @@
 - Linux: minimal `notify-send` backend with sound.
 - Silent while watching the session's tab; toasts auto-clear when the session moves on (a permission toast only on the asked tool, and the asking subagent's tool, running); no notifications for headless/helper sessions or background-agent turns.
 - `ping` skill so Claude finds the deliberate ping on its own; a turn that pinged sends no second done notification.
+- A permission toast for an MCP tool (shown as e.g. `Send Email`) now clears when the tool runs, instead of lingering until the next prompt.
 - Click from a terminal session focuses the window without opening a duplicate of the session in VS Code; a worktree opened as its own window is found by its folder name (Windows).

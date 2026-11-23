@@ -74,7 +74,13 @@ cn_should_clear() {
       return 0 ;;
     PostToolUse)
       if [ "$_cn_kind" = question ]; then [ "$3" = AskUserQuestion ] || return 1; fi
-      if [ -n "$_cn_mt" ] && [ "$3" != "$_cn_mt" ]; then return 1; fi
+      if [ -n "$_cn_mt" ] && [ "$3" != "$_cn_mt" ]; then
+        # MCP tools: the message shows "Send Email" for mcp__srv__send_email, so the marker holds
+        # "Send". Compare the payload's display-form first word, case-insensitively.
+        _cn_pt=$(printf '%s' "$3" | sed -e 's/.*__//' -e 's/_.*//' | tr 'A-Z' 'a-z')
+        _cn_mtl=$(printf '%s' "$_cn_mt" | tr 'A-Z' 'a-z')
+        [ -n "$_cn_pt" ] && [ "$_cn_pt" = "$_cn_mtl" ] || return 1
+      fi
       if [ -n "$_cn_ma" ] && [ "$4" != "$_cn_ma" ]; then return 1; fi
       return 0 ;;
   esac
