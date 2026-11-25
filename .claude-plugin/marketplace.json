@@ -1,0 +1,32 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "maxdimitrov-claude-notify",
+  "owner": {
+    "name": "Maksim Dimitrov"
+  },
+  "metadata": {
+    "description": "Desktop notifications for Claude Code sessions. Self-contained single-plugin marketplace."
+  },
+  "plugins": [
+    {
+      "name": "claude-notify",
+      "source": "./",
+      "description": "Desktop notifications (sound + toast naming the session) when a Claude Code session needs you or finishes; click focuses the right VS Code window and Claude tab.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maksim Dimitrov"
+      },
+      "homepage": "https://github.com/maxdimitrov/claude-notify",
+      "repository": "https://github.com/maxdimitrov/claude-notify",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "notifications",
+        "hooks",
+        "toast",
+        "vscode",
+        "claude-code"
+      ]
+    }
+  ]
+}

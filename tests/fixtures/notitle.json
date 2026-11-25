@@ -1,0 +1,1 @@
+{"session_id":"sess-nt-1","transcript_path":"@FIXTURES@/transcript_none.jsonl","cwd":"@FIXTURES@/fixture-repo","hook_event_name":"Notification","message":"Need permission","notification_type":"permission_prompt"}

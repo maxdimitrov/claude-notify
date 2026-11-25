@@ -1,0 +1,3 @@
+#!/bin/sh
+# claude-notify Linux backend: nothing to clear (notifications are not tracked).
+exit 0

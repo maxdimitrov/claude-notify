@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stub backend: logs "clear <args>" to $STUB_LOG.
+echo "clear $*" >> "${STUB_LOG:-/dev/null}"
+exit 0

@@ -1,0 +1,70 @@
+#!/bin/sh
+# claude-notify macOS backend: record on stdin -> notification + sound. Always exits 0.
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || exit 0
+. "$here/lib.sh" 2>/dev/null || exit 0
+
+event=; session=; entrypoint=; root=; rawroot=; projectdir=; title=; tabtitle=; line1=; line2=
+while IFS= read -r _l || [ -n "$_l" ]; do
+  _k=${_l%%=*}; _v=${_l#*=}
+  case "$_k" in
+    event) event=$_v ;; session) session=$_v ;; entrypoint) entrypoint=$_v ;;
+    root) root=$_v ;; rawroot) rawroot=$_v ;;
+    projectdir) projectdir=$_v ;; title) title=$_v ;; tabtitle) tabtitle=$_v ;;
+    line1) line1=$_v ;; line2) line2=$_v ;;
+  esac
+done
+
+# Silent while watching: only when the frontmost-window read succeeds. The window's
+# folder segment may be the repo root or, for a worktree opened on its own, rawroot.
+if command -v osascript >/dev/null 2>&1; then
+  if _out=$(osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to return (name & "|" & (name of front window))' 2>/dev/null); then
+    _app=${_out%%|*}; _win=${_out#*|}
+    case "$_app" in
+      Code*|Electron)
+        _first=$(cn_first_seg "$_win")
+        if [ -n "$_first" ] && [ -n "$tabtitle" ]; then
+          case "$tabtitle" in
+            "$_first"*)
+              if cn_has_seg "$_win" "$root" || { [ -n "$rawroot" ] && cn_has_seg "$_win" "$rawroot"; }; then
+                cn_log "notify $event session=$session silent: watching"
+                exit 0
+              fi ;;
+          esac
+        fi ;;
+    esac
+  else
+    cn_log "notify $event session=$session watch-check unavailable (osascript error)"
+  fi
+fi
+
+case "$event" in done) sound=Glass ;; *) sound=Ping ;; esac
+
+# terminal-notifier prints its usage for an empty -message: never pass one.
+message=$line2
+[ -n "$message" ] || message=$line1
+[ -n "$message" ] || message=$title
+[ -n "$message" ] || message=Claude
+
+if command -v terminal-notifier >/dev/null 2>&1; then
+  cmd="sh $(cn_q "$here/focus.sh") $(cn_q "$projectdir") $(cn_q "$session") $(cn_q "$entrypoint") $(cn_q "$rawroot")"
+  terminal-notifier -title "$title" -subtitle "$line1" -message "$message" \
+    -sound "$sound" -group "$session" -execute "$cmd" >/dev/null 2>&1
+  cn_log "notify $event session=$session terminal-notifier rc=$?"
+else
+  if command -v osascript >/dev/null 2>&1; then
+    osascript -e 'on run argv' \
+      -e 'display notification (item 3 of argv) with title (item 1 of argv) subtitle (item 2 of argv)' \
+      -e 'end run' -- "$title" "$line1" "$message" >/dev/null 2>&1
+  fi
+  command -v afplay >/dev/null 2>&1 && afplay "/System/Library/Sounds/$sound.aiff" >/dev/null 2>&1
+  cn_log "notify $event session=$session osascript fallback"
+  _hint="$(cn_mdir)/hint-shown"
+  if [ ! -f "$_hint" ]; then
+    mkdir -p "$(cn_mdir)" 2>/dev/null && : > "$_hint" 2>/dev/null
+    _msg="claude-notify: terminal-notifier not found; using plain notifications (no click-to-focus). Install: brew install terminal-notifier"
+    # The dispatcher discards stderr; the log line is the findable copy.
+    cn_log "hint: $_msg"
+    echo "$_msg" >&2
+  fi
+fi
+exit 0

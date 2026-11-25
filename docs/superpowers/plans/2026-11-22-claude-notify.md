@@ -21,6 +21,7 @@
 - Line 2: payload `message` (Notification) or `last_assistant_message` (Stop); whitespace collapsed, markdown stripped, max 180 chars (177 + `...`).
 - `<repo>` = leaf of `CLAUDE_PROJECT_DIR`, else payload `cwd`, after cutting any `/.claude/worktrees/<name>` (either slash direction) suffix.
 - Headless skip (notify and stop): `CLAUDE_CODE_ENTRYPOINT` matches `sdk*`, or `CLAUDE_CODE_SESSION_ATTENDED` = `0`; Stop also skips when `stop_hook_active` is true.
+- Silent while watching: no toast/sound/flash when the foreground window is the session's VS Code window and its title's first segment (minus trailing `.`/`...`) is a prefix of the session's tab title (spec, "Silent while watching").
 - Windows: reveal link only when exactly one window matches and it is foreground after a 1000 ms wait. Toast sender "Claude Code" via an AUMID; icon must not be Anthropic's logo.
 - Commits signed via normal `git commit`; never `--no-verify` / `--no-gpg-sign`. Work happens on branch `feat/initial` in a worktree; merging to `main` is the user's call.
 
@@ -65,6 +66,7 @@ session=<session_id>
 root=<repo name>
 projectdir=<full project dir, native path>
 title=<toast title>
+tabtitle=<tab title, may be empty>
 line1=<repo - tab title>
 line2=<message>
 ```
@@ -110,6 +112,7 @@ line2=<message>
   - `cn_tab_title transcript_titles.jsonl` -> `Live Account Analysis`; `transcript_cyr.jsonl` -> `Анализ на сметка`; `transcript_none.jsonl` -> empty; missing file -> empty
   - `cn_clean_text '**Bold** and `code` [link](http://x)\n- item'` -> `Bold and code link item`; 300-char input -> length 180 ending `...`
   - `cn_build_record permission perm.json` contains `title=Claude needs permission` and `line1=claude-notify-fixtures - Live Account Analysis` (or the fixture's repo name) and `line2=` with no `**`
+  - record from perm.json has `tabtitle=Live Account Analysis`; with transcript_none `tabtitle=` (empty)
   - `no_title`: line1 is just the repo name; `no_transcript`: same; `no_jq`: with `PATH` stripped of jq, record still has the right title and `line1=<repo>` and `line2=` empty or generic
 - [ ] **Step 3: Run** `sh tests/run.sh` -> FAIL (functions missing).
 - [ ] **Step 4: Implement `scripts/lib/content.sh`** using jq for JSON (`jq -r`), `tail -c 4194304` for the transcript, `sed` for markdown strip. Without jq, extract `session_id`, `cwd`, `notification_type`, `hook_event_name` with `sed` and leave line2 empty.
@@ -134,6 +137,7 @@ line2=<message>
   - `Read-CnRecord([byte[]]$Bytes) -> hashtable` (UTF-8 decode, split on first `=`)
   - `Read-CnStdinRecord() -> hashtable` (reads raw stdin bytes, calls Read-CnRecord)
   - `New-CnToastXml([hashtable]$Record, [string]$Link) -> string`: permission/question -> `<toast scenario="reminder" activationType="protocol" launch="$Link">` with actions `Go to session` (protocol, `$Link`) and a dismiss action (`activationType="system" arguments="dismiss"`); done -> `duration="long"` with the same launch link and no actions; always `<audio silent="true"/>`; every text XML-escaped
+  - `Test-CnWatching([string]$ForegroundTitle, [string]$Root, [string]$TabTitle) -> bool`: true when the title ends with ` - <Root> - Visual Studio Code` (case-insensitive) and its first segment, with a trailing `...` or `.` removed, is non-empty and a case-insensitive prefix of `$TabTitle`; false when `$TabTitle` is empty
   - `Get-CnLink([hashtable]$Record) -> string`: `claude-focus:?root=<urlencoded root>&session=<urlencoded session>`
   - `Register-CnHandlers([string]$PluginRoot, [string]$ClassesKey = 'HKCU:\Software\Classes')`: writes `$ClassesKey\AppUserModelId\$CnAppId` (`DisplayName`=`Claude Code`, `IconUri`=`<PluginRoot>\assets\icon.png`) and `$ClassesKey\claude-focus` (`URL:Claude Code focus`, `URL Protocol`, command `conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<PluginRoot>\scripts\windows\Focus.ps1" "%1"`); rewrites only when a stored value differs
   - `CcWin` type (Add-Type, once per process): `FindAll(string root) -> IntPtr[]`, `Flash(IntPtr)`, `StopFlash(IntPtr)`, `Focus(IntPtr) -> bool`, `Foreground() -> IntPtr`. Port the C# from `~/.claude/hooks/notify.ps1` and `focus-session.ps1` (title match: ends with ` - <root> - Visual Studio Code` or equals `<root> - Visual Studio Code`, case-insensitive; Focus: restore, SetForegroundWindow, AttachThreadInput, Alt tap)
@@ -142,6 +146,7 @@ line2=<message>
   - Read-CnRecord of UTF-8 bytes of `line1=x - Анализ на сметка` -> `line1` equals that string exactly
   - New-CnToastXml permission record -> loads as XML; root has `scenario="reminder"`; has an action with content `Go to session`; done record -> `duration="long"`, no `scenario`
   - XML escaping: record with `line2=<b> & "q" 'a'` -> `[xml]` parse succeeds and text node equals the raw string
+  - Test-CnWatching: (`Desktop and audio notifi. - claude - Visual Studio Code`, `claude`, `Desktop and audio notifications for input`) -> true; (`Notifications - claude - Visual Studio Code`, `claude`, `Notifications`) -> true; (`notify.ps1 - claude - Visual Studio Code`, `claude`, `Notifications`) -> false; (`Notifications - mailroom - Visual Studio Code`, `claude`, `Notifications`) -> false; empty TabTitle -> false
   - Get-CnLink with root `my repo` -> `claude-focus:?root=my%20repo&session=<id>`
   - Register-CnHandlers with `$ClassesKey='HKCU:\Software\ClaudeNotifyTest\Classes'` and PluginRoot `C:\p\1` -> command contains `C:\p\1\scripts\windows\Focus.ps1`; call again with `C:\p\2` -> command now contains `C:\p\2`; cleanup removes the test key
 - [ ] **Step 2: Run** `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows/Run-Tests.ps1` -> FAIL.
@@ -159,7 +164,8 @@ line2=<message>
 - Consumes: Common.ps1 (Task 3), record + backend contract (Task 2).
 - Produces: `notify` shim = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w <dir>/Notify.ps1)"` with stdin passed through; `clear` shim passes `-Session <id> -Root <root>` to Clear.ps1.
 
-- [ ] **Step 1: Notify.ps1:** `Read-CnStdinRecord`; `Register-CnHandlers` with the plugin root (two levels up from `$PSScriptRoot`); show toast under `$CnAppId` with `Tag` = session (truncate to 64 chars), `Group` = `$CnGroup`; flash all `FindAll(root)` matches; play the WAV (permission/question `Windows Notify Messaging.wav`, done `Windows Notify Email.wav`, fallback `SystemSounds.Exclamation`) with `PlaySync`. Each part in its own try/catch.
+- [ ] **Step 1: Notify.ps1:** `Read-CnStdinRecord`; if `Test-CnWatching` on the foreground window's title is true, exit 0 before anything else (log `watching` to `%TEMP%\claude-notify
+otify.log`); `Register-CnHandlers` with the plugin root (two levels up from `$PSScriptRoot`); show toast under `$CnAppId` with `Tag` = session (truncate to 64 chars), `Group` = `$CnGroup`; flash all `FindAll(root)` matches; play the WAV (permission/question `Windows Notify Messaging.wav`, done `Windows Notify Email.wav`, fallback `SystemSounds.Exclamation`) with `PlaySync`. Each part in its own try/catch.
 - [ ] **Step 2: Clear.ps1 `-Session -Root`:** `ToastNotificationManager.History.Remove(tag, $CnGroup, $CnAppId)`; `StopFlash` on matches.
 - [ ] **Step 3: Focus.ps1 `"%1"`:** port `~/.claude/hooks/focus-session.ps1` onto Common.ps1; new rule: `FindAll` count 0 -> log + exit; >1 -> focus first, log `ambiguous`, no reveal; 1 -> focus, wait 1000 ms, reveal only if still foreground. Log to `%TEMP%\claude-notify\focus.log`.
 - [ ] **Step 4: Pipe test** each event with fixtures through the real dispatcher (`CLAUDE_NOTIFY_PLATFORM_DIR` unset): `sh scripts/dispatch.sh notify < tests/fixtures/perm.json` etc. Expected: exit 0, toast appears with sender "Claude Code" and the icon, Cyrillic fixture renders correctly, no console window flashes. Then `clear` removes the permission toast.
@@ -172,12 +178,25 @@ line2=<message>
 
 **Interfaces:**
 - Consumes: record on stdin (Task 2).
-- Produces: `notify` uses `terminal-notifier -title "$title" -subtitle "$line1" -message "$line2" -sound <Glass for done, Ping otherwise> -group "$session" -execute "<focus cmd>"` when `command -v terminal-notifier`; else `osascript` `display notification` + `afplay /System/Library/Sounds/<same>.aiff` and a one-time stderr hint (marker `${TMPDIR}/claude-notify/hint-shown`). `clear <session> <root>` -> `terminal-notifier -remove "$session"`. `focus.sh <projectdir> <session>`: `code "$projectdir"` (fallback `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`), `sleep 1`, guard via `osascript -e 'tell application "System Events" to get name of front window of (first process whose frontmost is true)'`: if it succeeds and the name contains `$root` as a ` - `/` — ` separated segment -> open `vscode://anthropic.claude-code/open?session=$session`; if it errors (no Accessibility) -> open the link anyway and log `unguarded`; if it succeeds and does not match -> skip.
+- Produces: `notify` uses `terminal-notifier -title "$title" -subtitle "$line1" -message "$line2" -sound <Glass for done, Ping otherwise> -group "$session" -execute "<focus cmd>"` when `command -v terminal-notifier`; else `osascript` `display notification` + `afplay /System/Library/Sounds/<same>.aiff` and a one-time stderr hint (marker `${TMPDIR}/claude-notify/hint-shown`). Before notifying, if `osascript` can read the frontmost window title (System Events) and the frontmost app is VS Code and the title's first segment (separators ` - ` or ` — `, trailing `.`/`...` removed) is a prefix of `$tabtitle` and another segment equals `$root`, exit silently; if the read fails, notify. `clear <session> <root>` -> `terminal-notifier -remove "$session"`. `focus.sh <projectdir> <session>`: `code "$projectdir"` (fallback `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`), `sleep 1`, guard via `osascript -e 'tell application "System Events" to get name of front window of (first process whose frontmost is true)'`: if it succeeds and the name contains `$root` as a ` - `/` — ` separated segment -> open `vscode://anthropic.claude-code/open?session=$session`; if it errors (no Accessibility) -> open the link anyway and log `unguarded`; if it succeeds and does not match -> skip.
 
 - [ ] **Step 1: Write failing tests** `tests/test_mac.sh` with PATH stubs for `terminal-notifier`, `osascript`, `afplay`, `code`, `open` that log argv: record with `line2='$(touch /tmp/pwned) "q" `x`'` -> the `-execute` string, when run through `sh -c`, calls the focus script with the exact projectdir and session and creates no file; without the terminal-notifier stub, `osascript` is called and the hint marker is written once.
 - [ ] **Step 2: Run** `sh tests/test_mac.sh` -> FAIL. **Step 3: Implement.** **Step 4: Run** -> PASS (runs on this PC with stubs).
 - [ ] **Step 5: Mark unverified:** README "macOS" section lists the real-Mac check (install `brew install terminal-notifier`, set terminal-notifier to Alerts in System Settings > Notifications, click from another window) as pending.
 - [ ] **Step 6: ASCII check; commit** `feat(mac): terminal-notifier backend and focus`.
+
+### Task 5b: Background-turn filter and deliberate ping
+
+**Files:**
+- Modify: `scripts/lib/content.sh`, `scripts/dispatch.sh`, `tests/test_content.sh`, `tests/test_dispatch.sh`, `tests/fixtures/` (new transcripts), `scripts/windows/Common.ps1` + `tests/windows/Run-Tests.ps1` (title for `ping`), `scripts/mac/notify` (+ its test) and `scripts/linux/notify` if present (treat `ping` like `question`)
+
+**Interfaces:**
+- Produces: `cn_turn_origin <transcript_path>` -> last `origin.kind` in the transcript tail (same 4 MB cap), empty if none. `dispatch.sh ping "<message>"`: builds the record from env instead of stdin (session = `CLAUDE_CODE_SESSION_ID`, project dir = `CLAUDE_PROJECT_DIR` else `$PWD`, transcript = newest `*.jsonl` named `<session>.jsonl` under `$HOME/.claude/projects/*/` if found), `event=ping`, `title=Claude needs you`, `line2=<message>` (cleaned like other line2s); writes the marker like permission/question.
+
+- [ ] **Step 1: Fixtures + failing tests.** Transcripts ending in origin `peer`, `task-notification`, `human`, and one with no origin. Tests: `cn_turn_origin` returns each kind / empty; dispatcher `stop` with the peer and task-notification transcripts -> stub not called; with human and with no-origin -> called; `notify` (permission) with the peer transcript -> still called; `ping "ready to test"` with env set -> stub got `event=ping`, `title=Claude needs you`, `line2=ready to test`, marker written; `ping` honors the headless guards.
+- [ ] **Step 2: Run** `sh tests/run.sh` -> FAIL. **Step 3: Implement.** Match `"origin":{"kind":"..."}` exactly as Claude Code writes it (no spaces); fail open.
+- [ ] **Step 4: Backends treat `ping` like `question`:** Windows `New-CnToastXml` reminder scenario + "Go to session" for `ping` (test), sound as permission; macOS sound as permission (test); Linux urgency critical.
+- [ ] **Step 5: Run** both suites -> PASS; ASCII check; commit `feat: skip done for background turns; add deliberate ping`.
 
 ### Task 6: Linux backend (minimal)
 

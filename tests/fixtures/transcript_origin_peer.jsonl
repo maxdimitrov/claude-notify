@@ -1,0 +1,3 @@
+{"parentUuid":null,"type":"user","message":{"role":"user","content":"hi"},"origin":{"kind":"human"},"sessionId":"s"}
+{"type":"assistant","message":{"role":"assistant","content":"ok"}}
+{"parentUuid":"a","type":"user","message":{"role":"user","content":"agent done"},"origin":{"kind":"peer"}}
