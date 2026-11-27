@@ -1,0 +1,6 @@
+{"parentUuid":null,"type":"user","message":{"role":"user","content":"go"},"origin":{"kind":"human"},"sessionId":"s"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"Async agent launched successfully.\nagentId: a1"}]}]},"toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a1","description":"x"}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"Async agent launched successfully.\nagentId: a2"}]}]},"toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a2","description":"x"}}
+{"type":"assistant","message":{"role":"assistant","content":"Waiting on the agents."}}
+{"type":"user","message":{"role":"user","content":"<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n</task-notification>"},"origin":{"kind":"task-notification","producer":"session-task","runId":"r1"}}
+{"type":"assistant","message":{"role":"assistant","content":"Waiting on the agents."}}

@@ -165,7 +165,11 @@ assert_log_has cyr_tab "tabtitle=$(cat "$FIX/expected_cyr.txt")"
 # --- background-turn filter (stop only)
 stopfx() { fx stop.json | sed "s/transcript_titles/$1/" | sh "$DISPATCH" stop; echo $?; }
 reset; rc=$(stopfx transcript_origin_peer); assert_rc0 stop_peer_rc "$rc"; assert_log_empty stop_peer_skipped
-reset; rc=$(stopfx transcript_origin_task); assert_log_empty stop_task_skipped
+reset; rc=$(stopfx transcript_origin_task); assert_log_has stop_task_notifies 'event=done'
+reset; rc=$(stopfx transcript_bg_pending); assert_rc0 stop_bg_pending_rc "$rc"; assert_log_empty stop_bg_pending_skipped
+reset; rc=$(stopfx transcript_bg_partial); assert_log_empty stop_bg_partial_skipped
+reset; rc=$(stopfx transcript_bg_done); assert_log_has stop_bg_done_notifies 'event=done'
+reset; rc=$(stopfx transcript_bg_quoted); assert_log_has stop_bg_quoted_notifies 'event=done'
 reset; rc=$(stopfx transcript_origin_human); assert_log_has stop_human_notifies 'event=done'
 reset; rc=$(stopfx transcript_origin_none); assert_log_has stop_noorigin_notifies 'event=done'
 reset; fx perm.json | sed 's/transcript_titles/transcript_origin_peer/' | sh "$DISPATCH" notify >/dev/null
