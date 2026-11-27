@@ -8,6 +8,7 @@ W="$T/cn-mac-$$"; mkdir -p "$W/bin"
 export TMPDIR="$W/tmp"; mkdir -p "$TMPDIR"
 export LOG="$W/calls.log"
 export CLAUDE_NOTIFY_FOCUS_DELAY=0
+export CLAUDE_NOTIFY_CLAUDE_APP="$W/NoClaude.app"
 EM=$(printf '\342\200\224')
 
 # Stubs: log argv, one "ARG <value>" line per argument.
@@ -24,6 +25,9 @@ mkstub terminal-notifier ':'
 mkstub afplay ':'
 mkstub code ':'
 mkstub open ':'
+# defaults: the app's icon name only when the app dir exists; sips: write its --out (last arg).
+mkstub defaults '[ -d "$CLAUDE_NOTIFY_CLAUDE_APP" ] && echo fake; exit 0'
+mkstub sips 'for a; do :; done; printf png > "$a"'
 # osascript: System Events reads follow OSA_MODE/OSA_OUT; display notification always succeeds.
 mkstub osascript 'case "$*" in *"System Events"*) [ "${OSA_MODE:-fail}" = ok ] && { printf "%s\n" "$OSA_OUT"; exit 0; }; exit 1 ;; esac; exit 0'
 # Stubs shadow their real counterparts; "no terminal-notifier" is a second bin dir without
@@ -95,6 +99,25 @@ has ping_sound 'ARG Ping'
 # 2. done uses Glass
 reset; rec done "r" "m" "" | run_notify >/dev/null
 has done_glass 'ARG Glass'
+
+# 2b. content image: the bell without the Claude app; the app's icon converted once, again
+# when the app's icon is newer
+reset; rec permission "r" "m" "" | run_notify >/dev/null
+has icon_flag 'ARG -contentImage'
+has icon_bell "ARG $(cd "$here/.." && pwd)/assets/icon.png"
+hasnt icon_bell_no_sips 'CALL sips'
+APP="$W/Claude.app"; mkdir -p "$APP/Contents/Resources"; : > "$APP/Contents/Resources/fake.icns"
+export CLAUDE_NOTIFY_CLAUDE_APP="$APP"
+reset; rec permission "r" "m" "" | run_notify >/dev/null
+has icon_app_sips 'CALL sips'
+has icon_app "ARG $TMPDIR/claude-notify/claude.png"
+: > "$LOG"; rec permission "r" "m" "" | run_notify >/dev/null
+hasnt icon_cached 'CALL sips'
+has icon_cached_arg "ARG $TMPDIR/claude-notify/claude.png"
+touch -t 203001010000 "$APP/Contents/Resources/fake.icns"
+: > "$LOG"; rec permission "r" "m" "" | run_notify >/dev/null
+has icon_refresh 'CALL sips'
+export CLAUDE_NOTIFY_CLAUDE_APP="$W/NoClaude.app"
 
 # 3. fallback without terminal-notifier: osascript + afplay, hint once
 reset

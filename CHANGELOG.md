@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- macOS: notifications carry the Claude icon as their content image, taken from `/Applications/Claude.app` (the plugin's bell without it). The sender icon stays terminal-notifier's: `-appIcon` is ignored on current macOS, and `-sender` would break the click handler.
+- Tests: the no-jq and no-terminal-notifier tests hide only that command, so they pass on a real Mac (jq in `/usr/bin`, terminal-notifier from Homebrew).
+
 ## 0.1.0
 
 - Desktop notifications (sound + toast naming the session as `<repo> - <tab title>`) for permission prompts, questions and finished turns, plus a deliberate `ping`.

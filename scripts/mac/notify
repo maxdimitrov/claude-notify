@@ -47,8 +47,11 @@ message=$line2
 
 if command -v terminal-notifier >/dev/null 2>&1; then
   cmd="sh $(cn_q "$here/focus.sh") $(cn_q "$projectdir") $(cn_q "$session") $(cn_q "$entrypoint") $(cn_q "$rawroot")"
-  terminal-notifier -title "$title" -subtitle "$line1" -message "$message" \
-    -sound "$sound" -group "$session" -execute "$cmd" >/dev/null 2>&1
+  set -- -title "$title" -subtitle "$line1" -message "$message" \
+    -sound "$sound" -group "$session" -execute "$cmd"
+  _icon=$(cn_icon "$here")
+  [ -n "$_icon" ] && set -- "$@" -contentImage "$_icon"
+  terminal-notifier "$@" >/dev/null 2>&1
   cn_log "notify $event session=$session terminal-notifier rc=$?"
 else
   if command -v osascript >/dev/null 2>&1; then

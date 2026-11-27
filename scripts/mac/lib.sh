@@ -42,6 +42,29 @@ cn_has_any_seg() {
   cn_has_seg "$1" "$2"
 }
 
+# cn_icon <scripts/mac dir> -> image for terminal-notifier -contentImage (-appIcon is ignored
+# on current macOS). The Claude app's icon, converted once into the log dir and again when the
+# app's icon is newer (the logo is not shipped in this repo); else the plugin's bell.
+# CLAUDE_NOTIFY_CLAUDE_APP overrides the app path (tests).
+cn_icon() {
+  _app=${CLAUDE_NOTIFY_CLAUDE_APP:-/Applications/Claude.app}
+  _png="$(cn_mdir)/claude.png"
+  _ic=$(defaults read "$_app/Contents/Info" CFBundleIconFile 2>/dev/null)
+  if [ -n "$_ic" ]; then
+    _icns="$_app/Contents/Resources/${_ic%.icns}.icns"
+    if [ -f "$_icns" ]; then
+      if [ ! -s "$_png" ] || [ "$_icns" -nt "$_png" ]; then
+        mkdir -p "$(cn_mdir)" 2>/dev/null
+        sips -s format png -Z 256 "$_icns" --out "$_png" >/dev/null 2>&1 || rm -f "$_png" 2>/dev/null
+      fi
+      [ -s "$_png" ] && { printf '%s' "$_png"; return 0; }
+    fi
+  fi
+  _bell="$(cd "$1/../.." 2>/dev/null && pwd)/assets/icon.png"
+  [ -f "$_bell" ] && printf '%s' "$_bell"
+  return 0
+}
+
 # cn_q <value> -> value wrapped in single quotes, embedded ' escaped as '\''
 cn_q() {
   _bs='\'

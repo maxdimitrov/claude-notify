@@ -44,7 +44,7 @@ Same two commands, then:
 brew install terminal-notifier
 ```
 
-Set terminal-notifier to the Alerts style in System Settings > Notifications so notifications stay on screen (Banners vs Alerts is a per-app setting, so the permission/done difference cannot be made on macOS). Without terminal-notifier it falls back to `osascript` + `afplay`, with no click action. Grant Accessibility/Automation permission for System Events to enable the watching check and the click guard (details in the macOS section below).
+Set terminal-notifier to the Alerts style in System Settings > Notifications so notifications stay on screen (Banners vs Alerts is a per-app setting, so the permission/done difference cannot be made on macOS). Without terminal-notifier it falls back to `osascript` + `afplay`, with no click action. With terminal-notifier, each notification shows the Claude icon as its image on the right, taken from the Claude desktop app if installed (otherwise the plugin's bell); the sender icon on the left stays terminal-notifier's, since macOS ignores `-appIcon` and `-sender` would disable the click action. Grant Accessibility/Automation permission for System Events to enable the watching check and the click guard (details in the macOS section below).
 
 ### Linux
 
