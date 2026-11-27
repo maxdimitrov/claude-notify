@@ -5,7 +5,7 @@ description: Use when the user asks to be pinged, notified, or told when somethi
 
 # Ping the user
 
-claude-notify does not send "done" notifications for turns started by background agents or tasks, so the moment the user is waiting for can pass silently. A ping is the deliberate notification for that moment.
+claude-notify sends "done" only when the session waits on the user: never while a background agent or command this session launched is still running. A moment the user must act on can come while other background work still runs (one of several jobs finished, or the result needs the user now), and that moment would pass silently. A ping is the deliberate notification for that moment.
 
 ## How
 

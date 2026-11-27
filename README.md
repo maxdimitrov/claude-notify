@@ -17,7 +17,7 @@ The first line of every notification is `<repo> - <tab title>` (for example `qua
 
 - Permission and question toasts clear themselves when the session moves on: a permission toast when the tool it asked about runs (for a subagent's prompt, when that subagent's tool runs) or when you send your next prompt; a question toast when you answer it or send a prompt. Denying a permission in the dialog does not clear it right away; it goes on your next prompt or on the session's next use of that tool. (`PermissionDenied` also clears it, but that hook appears to fire for auto-mode classifier denials, not for a manual deny.) A finished turn's done toast replaces it either way.
 - It stays silent while you are watching that session's tab in the foreground VS Code window.
-- No "done" notification for turns started by background agents, nor for a turn that already sent a `ping`.
+- "Done" means the session is waiting on you: no "done" while a background agent or command the session launched is still running (its result resumes the session), after a message from another session, or for a turn that already sent a `ping`. When the last background task finishes and Claude wraps up, "done" fires.
 - Clicking a notification from a terminal session (not a VS Code Claude tab) focuses the project's VS Code window but does not open the session there, so it never starts a duplicate of a terminal session.
 - A worktree opened as its own VS Code window is found by its own folder name; otherwise the repo's window is used.
 - Headless and helper sessions (SDK runs, sessions other plugins spawn) never notify.
@@ -44,7 +44,7 @@ Same two commands, then:
 brew install terminal-notifier
 ```
 
-Set terminal-notifier to the Alerts style in System Settings > Notifications so notifications stay on screen (Banners vs Alerts is a per-app setting, so the permission/done difference cannot be made on macOS). Without terminal-notifier it falls back to `osascript` + `afplay`, with no click action. Grant Accessibility/Automation permission for System Events to enable the watching check and the click guard (details in the macOS section below).
+Set terminal-notifier to the Alerts style in System Settings > Notifications so notifications stay on screen (Banners vs Alerts is a per-app setting, so the permission/done difference cannot be made on macOS). Without terminal-notifier it falls back to `osascript` + `afplay`, with no click action. With terminal-notifier, each notification shows the Claude icon as its image on the right, taken from the Claude desktop app if installed (otherwise the plugin's bell); the sender icon on the left stays terminal-notifier's, since macOS ignores `-appIcon` and `-sender` would disable the click action. Grant Accessibility/Automation permission for System Events to enable the watching check and the click guard (details in the macOS section below).
 
 ### Linux
 

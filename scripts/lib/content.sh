@@ -177,15 +177,39 @@ cn_build_record() {
   cn_emit_record "$_cn_ev" "$_cn_sid" "$_cn_dir" "$_cn_tab" "$_cn_l2" "${3:-}"
 }
 
-# cn_turn_origin <transcript_path> -> last "origin":{"kind":"<kind>"} in the last 4 MB, else empty.
-# Kinds seen: human, peer, task-notification. Plain text match, no jq needed.
+# cn_turn_origin <transcript_path> -> last "origin":{"kind":"<kind>"...} in the last 4 MB, else empty.
+# Kinds seen: human, peer, task-notification (which carries more fields after kind).
+# Plain text match, no jq needed.
 cn_turn_origin() {
   _cn_p=$1
   [ -n "$_cn_p" ] || return 0
   [ -f "$_cn_p" ] || _cn_p=$(printf '%s' "$_cn_p" | sed 's#\\#/#g')
   [ -f "$_cn_p" ] || return 0
-  tail -c 4194304 "$_cn_p" 2>/dev/null | grep -o '"origin":{"kind":"[^"]*"}' | tail -n 1 \
-    | sed 's/^"origin":{"kind":"\(.*\)"}$/\1/' | tr -d '\r'
+  tail -c 4194304 "$_cn_p" 2>/dev/null | grep -o '"origin":{"kind":"[^"]*"' | tail -n 1 \
+    | sed 's/^"origin":{"kind":"\(.*\)"$/\1/' | tr -d '\r'
+}
+
+# cn_tasks_pending <transcript_path> -> status 0 when a background agent or command launched in
+# the last 4 MB has no task-notification yet: the session waits on it, not on the user.
+# Launches are the structured tool results ("status":"async_launched","agentId":"<id>" for an
+# agent, "backgroundTaskId":"<id>" for a command), which quoted text (escaped) cannot match;
+# ends are <task-id> in task-notification turns, any status. Unknown formats fail open (1).
+cn_tasks_pending() {
+  _cn_p=$1
+  [ -n "$_cn_p" ] || return 1
+  [ -f "$_cn_p" ] || _cn_p=$(printf '%s' "$_cn_p" | sed 's#\\#/#g')
+  [ -f "$_cn_p" ] || return 1
+  _cn_tail=$(tail -c 4194304 "$_cn_p" 2>/dev/null)
+  _cn_up=$(printf '%s\n' "$_cn_tail" \
+    | grep -o -e '"status":"async_launched","agentId":"[^"]*"' -e '"backgroundTaskId":"[^"]*"' \
+    | sed 's/.*:"\([^"]*\)"$/\1/' | tr -d '\r' | sort -u)
+  [ -n "$_cn_up" ] || return 1
+  _cn_end=$(printf '%s\n' "$_cn_tail" | grep '"origin":{"kind":"task-notification"' \
+    | grep -o '<task-id>[^<]*</task-id>' | sed 's#<task-id>\(.*\)</task-id>#\1#' | tr -d '\r')
+  for _cn_id in $_cn_up; do
+    printf '%s\n' "$_cn_end" | grep -qxF -- "$_cn_id" || return 0
+  done
+  return 1
 }
 
 # cn_build_ping <message> [marker] -> the record for a deliberate ping, built from env:

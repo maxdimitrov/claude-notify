@@ -159,6 +159,17 @@ assert_eq origin_peer peer "$(cn_turn_origin "$FIX/transcript_origin_peer.jsonl"
 assert_eq origin_task task-notification "$(cn_turn_origin "$FIX/transcript_origin_task.jsonl")"
 assert_eq origin_human human "$(cn_turn_origin "$FIX/transcript_origin_human.jsonl")"
 assert_eq origin_none '' "$(cn_turn_origin "$FIX/transcript_origin_none.jsonl")"
+assert_eq origin_task_fields task-notification "$(cn_turn_origin "$FIX/transcript_bg_done.jsonl")"
+
+# --- background work still running
+pending() { if cn_tasks_pending "$1"; then echo yes; else echo no; fi; }
+assert_eq bg_pending yes "$(pending "$FIX/transcript_bg_pending.jsonl")"
+assert_eq bg_partial yes "$(pending "$FIX/transcript_bg_partial.jsonl")"
+assert_eq bg_done no "$(pending "$FIX/transcript_bg_done.jsonl")"
+assert_eq bg_quoted no "$(pending "$FIX/transcript_bg_quoted.jsonl")"
+assert_eq bg_none no "$(pending "$FIX/transcript_origin_human.jsonl")"
+assert_eq bg_missing no "$(pending "$FIX/nope.jsonl")"
+assert_eq bg_empty_arg no "$(pending '')"
 assert_eq origin_missing '' "$(cn_turn_origin "$FIX/nope.jsonl")"
 assert_eq origin_empty_arg '' "$(cn_turn_origin '')"
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*)
@@ -197,14 +208,9 @@ assert_eq ping_pwd_last wrong-repo "$(field root "$rec")"
 assert_eq md_dunder 'edit __init__.py now' "$(cn_clean_text 'edit __init__.py now')"
 assert_eq md_bold 'a bold b' "$(cn_clean_text 'a **bold** b')"
 
-# --- no jq: build a PATH without any dir that holds jq
-nojq=""
-oldifs=$IFS; IFS=:
-for d in $PATH; do
-  if [ -x "$d/jq" ] || [ -x "$d/jq.exe" ]; then continue; fi
-  nojq="${nojq:+$nojq:}$d"
-done
-IFS=$oldifs
+# --- no jq: a PATH without jq that keeps the other tools of jq's dir
+. "$here/pathlib.sh"
+nojq=$(path_without jq "$FIXROOT")
 if PATH="$nojq" command -v jq >/dev/null 2>&1; then
   echo "SKIP no_jq (cannot remove jq from PATH)"
 else

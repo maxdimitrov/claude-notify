@@ -1,0 +1,3 @@
+{"parentUuid":null,"type":"user","message":{"role":"user","content":"go"},"origin":{"kind":"human"},"sessionId":"s"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"{\"toolUseResult\":{\"isAsync\":true,\"status\":\"async_launched\",\"agentId\":\"q1\"},\"backgroundTaskId\":\"q2\"}"}]}}
+{"type":"assistant","message":{"role":"assistant","content":"Read it."}}

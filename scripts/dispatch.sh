@@ -53,7 +53,11 @@ case "$mode" in
     [ "$(cn_field "$payload" stop_hook_active)" = true ] && exit 0
     # A deliberate ping is up: it already told the user; keep it (and its marker).
     case "$(cat "$marker" 2>/dev/null)" in ping|"ping "*) exit 0 ;; esac
-    case "$(cn_turn_origin "$(cn_field "$payload" transcript_path)")" in ""|human) ;; *) exit 0 ;; esac
+    # Done only when the session waits on the user: not after a peer message, and not while a
+    # background agent or command it launched is still running (its result resumes the session).
+    _tp=$(cn_field "$payload" transcript_path)
+    case "$(cn_turn_origin "$_tp")" in ""|human|task-notification) ;; *) exit 0 ;; esac
+    cn_tasks_pending "$_tp" && exit 0
     event=done
     ;;
   ping) event=ping; mk=ping ;;

@@ -1,0 +1,4 @@
+{"parentUuid":null,"type":"user","message":{"role":"user","content":"go"},"origin":{"kind":"human"},"sessionId":"s"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"Async agent launched successfully.\nagentId: a1"}]}]},"toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a1","description":"x"}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"Command running in background with ID: b1"}]},"toolUseResult":{"stdout":"","stderr":"","interrupted":false,"backgroundTaskId":"b1"}}
+{"type":"assistant","message":{"role":"assistant","content":"Waiting on the agents."}}

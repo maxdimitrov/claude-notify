@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- "Done" only when the session waits on the user: silent while a background agent or command it launched has not reported back (matched by id between the launch's tool result and the `task-notification`), and now sent for the turn that handles the last background result. Turns from peer messages stay silent.
+- Turn origin is read from `task-notification` entries that carry fields after `kind` (`producer`, `runId`); before, those were missed and the previous origin was used.
+- macOS: notifications carry the Claude icon as their content image, taken from `/Applications/Claude.app` (the plugin's bell without it). The sender icon stays terminal-notifier's: `-appIcon` is ignored on current macOS, and `-sender` would break the click handler.
+- Tests: the no-jq and no-terminal-notifier tests hide only that command, so they pass on a real Mac (jq in `/usr/bin`, terminal-notifier from Homebrew).
+
 ## 0.1.0
 
 - Desktop notifications (sound + toast naming the session as `<repo> - <tab title>`) for permission prompts, questions and finished turns, plus a deliberate `ping`.
