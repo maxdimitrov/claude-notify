@@ -197,14 +197,9 @@ assert_eq ping_pwd_last wrong-repo "$(field root "$rec")"
 assert_eq md_dunder 'edit __init__.py now' "$(cn_clean_text 'edit __init__.py now')"
 assert_eq md_bold 'a bold b' "$(cn_clean_text 'a **bold** b')"
 
-# --- no jq: build a PATH without any dir that holds jq
-nojq=""
-oldifs=$IFS; IFS=:
-for d in $PATH; do
-  if [ -x "$d/jq" ] || [ -x "$d/jq.exe" ]; then continue; fi
-  nojq="${nojq:+$nojq:}$d"
-done
-IFS=$oldifs
+# --- no jq: a PATH without jq that keeps the other tools of jq's dir
+. "$here/pathlib.sh"
+nojq=$(path_without jq "$FIXROOT")
 if PATH="$nojq" command -v jq >/dev/null 2>&1; then
   echo "SKIP no_jq (cannot remove jq from PATH)"
 else

@@ -26,10 +26,11 @@ mkstub code ':'
 mkstub open ':'
 # osascript: System Events reads follow OSA_MODE/OSA_OUT; display notification always succeeds.
 mkstub osascript 'case "$*" in *"System Events"*) [ "${OSA_MODE:-fail}" = ok ] && { printf "%s\n" "$OSA_OUT"; exit 0; }; exit 1 ;; esac; exit 0'
-# PATH without the stubs' real counterparts is not needed: stubs shadow; "no terminal-notifier"
-# is simulated by a second bin dir without it.
+# Stubs shadow their real counterparts; "no terminal-notifier" is a second bin dir without
+# it, so BASEPATH must not reach a real one either (Homebrew installs it on a real Mac).
 mkdir -p "$W/bin2"; for s in afplay code open osascript; do cp "$W/bin/$s" "$W/bin2/$s"; done
-BASEPATH=$PATH
+. "$here/pathlib.sh"
+BASEPATH=$(path_without terminal-notifier "$W")
 
 fails=0
 ok() { echo "ok   $1"; }
