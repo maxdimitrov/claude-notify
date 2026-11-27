@@ -1,6 +1,6 @@
 {
   "name": "claude-notify",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Desktop notifications (sound + toast naming the session) when a Claude Code session needs you or finishes; click focuses the right VS Code window and Claude tab.",
   "author": {
     "name": "Maksim Dimitrov"

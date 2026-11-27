@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - "Done" only when the session waits on the user: silent while a background agent or command it launched has not reported back (matched by id between the launch's tool result and the `task-notification`), and now sent for the turn that handles the last background result. Turns from peer messages stay silent.
 - Turn origin is read from `task-notification` entries that carry fields after `kind` (`producer`, `runId`); before, those were missed and the previous origin was used.
